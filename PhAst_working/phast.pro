@@ -731,7 +731,8 @@ top_menu_desc = [ $
                 {cw_pdmenu_s, 0, 'Ecliptic (J2000)'}, $
                 {cw_pdmenu_s, 2, 'Native'}, $
                 {cw_pdmenu_s, 1, 'Select catalog'},$
-                {cw_pdmenu_s, 2, 'USNO-B1.0 (online)'}, $
+                {cw_pdmenu_s, 0, 'USNO-B1.0 (online)'}, $
+                {cw_pdmenu_s, 2, 'GSC 2.3 (online)'}, $
                 ;{cw_pdmenu_s, 0, 'USNOA2'},$
                 ;{cw_pdmenu_s, 2, 'UCAC2'},$
                 {cw_pdmenu_s, 0, '--------------'},$
@@ -1544,6 +1545,7 @@ case event_name of
     END 
     ;Catalog options
     'USNO-B1.0 (online)': state.catalog_name = 'USNO-B1.0'
+    'GSC 2.3 (online)': state.catalog_name = 'GSC 2.3'
     'USNOA2': state.catalog_name = 'USNOA2'
     'UCAC2': state.catalog_name = 'UCAC2'
     'MPC report': phast_mpc_report
@@ -2452,6 +2454,37 @@ endif else return, [0,0]
 end
 
 ;----------------------------------------------------------------------
+function  phast_get_stars
+
+;routine to retrieve stars from an outside catalog and return
+;parameters in the result as follows:
+;result[0.*] = name
+;result[1,*] = ra
+;result[2,*] = dec
+;result[3,*] = mag
+
+common phast_state
+
+
+if state.catalog_loaded eq 0 then begin
+   widget_control,/hourglass    ;initial load could take some time
+   if state.catalog_name eq 'USNO-B1.0' then begin
+      star_catalog = queryvizier('USNO-B1',[a,d],10)
+      result = strarr(4,n_elements(star_catalog.B1MAG))
+      result[0,*] = star_catalog.USNO_B1_0
+      result[1,*] = star_catalog.RAJ2000
+      result[2,*] = star_catalog.DEJ2000
+      result[3,*] = star_catalog.B1MAG
+   endif
+   if state.catalog_name eq 'GSC 2.3' then begin
+      star_catalog = queryvizier('GSC2.3',[a,],10)
+   endif
+   state.catalog_loaded = 1
+end
+return result
+end
+;----------------------------------------------------------------------
+
 pro phast_display_stars
 
 ;routine to overlay catalog star postions/names based on WCS pointing
