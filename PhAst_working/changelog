@@ -1,0 +1,2 @@
+-Increased file import speed greatly by reducing number of array resizes for image archive. [Morgan Rehnberg]
+-added inital test support for VICAR images. [Morgan Rehnberg]
