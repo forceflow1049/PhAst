@@ -93,8 +93,6 @@ common phast_images, $
    pan_image, $
    startup_image, $
    image_archive, $
-   imagename_archive, $
-   imagehead_archive,$
    star_catalog, $
    cal_science, $
    cal_dark, $
@@ -165,6 +163,7 @@ mpc = { $
         }
 
 state = {                   $
+        filter_color: 'Blue', $ ;which filter for catalog photometry?
         image_type: 'FITS',  $  ;what kind of image is being viewed?
         bias_filename: 'No bias loaded',$;name of bias file
         flat_filename: 'No flat loaded',$;name of flat file
@@ -444,9 +443,7 @@ plot_ptr = ptrarr(maxplot+1)  ; The 0th element isn't used.
 blink_image1 = 0
 blink_image2 = 0
 blink_image3 = 0
-image_archive = 0
-imagename_archive = ""
-imagehead_archive = ""
+image_archive = objarr(1)
 star_catalog=0
 ;state.sex_catalog_name = 'test.cat'
 cal_science = 0
@@ -735,6 +732,10 @@ top_menu_desc = [ $
                 {cw_pdmenu_s, 2, 'GSC 2.3 (online)'}, $
                 ;{cw_pdmenu_s, 0, 'USNOA2'},$
                 ;{cw_pdmenu_s, 2, 'UCAC2'},$
+                {cw_pdmenu_s, 1, 'Select filter'},$
+                {cw_pdmenu_s, 0, 'Blue'},$
+                {cw_pdmenu_s, 0, 'Visible'},$
+                {cw_pdmenu_s, 2, 'Red'},$
                 {cw_pdmenu_s, 0, '--------------'},$
                 {cw_pdmenu_s, 2, 'MPC report'},$
                 {cw_pdmenu_s, 1, 'Pipeline'}, $
@@ -1046,21 +1047,15 @@ common phast_state
 common phast_images
 if not keyword_set(all) then begin
     if state.num_images gt 1 then begin
-        temp_image = dblarr(state.num_images-1,state.image_size[0],state.image_size[1])
-        temp_names = strarr(state.num_images-1,state.image_size[0],state.image_size[1])
-        temp_heads = strarr(state.num_images-1, n_elements(imagehead_archive[0,*]))
+        temp_image = objarr(state.num_images-1)
         j=0
         for i=0, state.num_images-1 do begin
             if i ne index then begin
-                temp_image[j,*,*] = image_archive[i,*,*]
-                temp_names[j,*,*] = imagename_archive[i,*,*]
-                temp_heads[j,*] = imagehead_archive[i,*]
+                temp_image[j] = image_archive[i]
                 j++
             endif
         endfor
         image_archive = temp_image
-        imagename_archive = temp_names
-        imagehead_archive = temp_heads
         while 1 eq 1 do begin   ;choose only one
             if index eq 0 then begin
                 state.num_images--
@@ -1082,8 +1077,6 @@ if not keyword_set(all) then begin
         endwhile
     endif else begin
         image_archive = 0.0
-        imagehead_archive = ''
-        imagename_archive = ''
         state.num_images = 0
         state.current_image_index = 0
         state.catalog_loaded = 0
@@ -1094,8 +1087,6 @@ if not keyword_set(all) then begin
     endelse
 endif else begin
     image_archive = 0.0
-    imagehead_archive = ''
-    imagename_archive = ''
     state.num_images = 0
     state.current_image_index = 0
     state.catalog_loaded = 0
@@ -1120,78 +1111,59 @@ if not keyword_set(refresh_toggle) then begin ;normal image adding
    new_image_size = size(new_image)
    if not keyword_set(dir_add) then begin
       if state.num_images gt 0 then begin ;check not first image
-         if new_image_size[1] eq state.image_size[0] then begin
-            state.num_images++
-            temp_arr = image_archive
-            temp_names = imagename_archive
-            image_archive = dblarr(state.num_images,new_image_size[1],new_image_size[2])
-            imagename_archive = strarr(state.num_images)
-            for i=0, state.num_images-2 do begin
-               image_archive[i,*,*] = temp_arr[i,*,*]
-               imagename_archive[i] = temp_names[i]
-            endfor
-            image_archive[state.num_images-1,*,*] = new_image
-            imagename_archive[state.num_images-1] = filename
-            phast_add_header,head
-            phast_setheader,head
-            newimage = 1
-         endif else  begin
-            result=dialog_message('File not added: image dimensions do not match previously loaded images',/error)
-            newimage = 0
-         endelse
+         state.num_images++
+         temp_arr = image_archive
+         image_archive = objarr(state.num_images)
+         for i=0, state.num_images-2 do image_archive[i] = temp_arr[i]
+         image_archive[state.num_images-1] = obj_new('image') ;create new image object
+         image_archive[state.num_images-1]->set_image, new_image
+         image_archive[state.num_images-1]->set_name, filename
+         image_archive[state.num_images-1]->set_header, head
+         phast_setheader,head
+         newimage = 1
       endif else begin          ;handle first image add
          state.num_images++
-         image_archive = dblarr(1,new_image_size[1],new_image_size[2])
-          imagename_archive = strarr(1)
-          imagehead_archive = strarr(1,n_elements(head))
-          image_archive[0,*,*] = new_image
-          imagename_archive[0] = filename
-          imagehead_archive[0,*] = head
-          state.image_size[0] = new_image_size[1]
-          state.image_size[1] = new_image_size[2]
+         image_archive = objarr(1)
+          image_archive[0] = obj_new('image') ;create new image object
+          image_archive[0]->set_image, new_image
+          image_archive[0]->set_name, filename
+          image_archive[0]->set_header, head
           newimage = 1 
        endelse
    endif else begin             ;handle directory add
       if keyword_set(dir_num) then begin
              if state.num_images gt 0 then begin
                 temp_image = image_archive
-                temp_name = imagename_archive
                 
-                image_archive = dblarr(state.num_images+dir_num,state.image_size[0],state.image_size[1])
-                imagename_archive = strarr(state.num_images+dir_num)
-                for i=0, state.num_images-2 do begin
-                   image_archive[i,*,*] = temp_image[i,*,*]
-                   imagename_archive[i] = temp_name[i]
-                endfor
-                image_archive[state.num_images,*,*] = new_image
-                imagename_archive[state.num_images] = filename
+                image_archive = objarr(state.num_images+dir_num)
+                for i=0, state.num_images-2 do image_archive[i] = temp_image[i]
+                image_archive[state.num_images] = obj_new('image') ;create new image object
+                image_archive[state.num_images]->set_image, new_image
+                image_archive[state.num_images]->set_name, filename
+                image_archive[state.num_images]->set_header, head
                 state.num_images++
-                phast_add_header,head
              endif else begin   ;handle first image add
                 state.num_images++
-                image_archive = dblarr(dir_num,new_image_size[1],new_image_size[2])
-                imagename_archive = strarr(dir_num)
-                imagehead_archive = strarr(dir_num,n_elements(head))
-                image_archive[0,*,*] = new_image
-                imagename_archive[0] = filename
-                imagehead_archive[0,*] = head
-                state.image_size[0] = new_image_size[1]
-                state.image_size[1] = new_image_size[2]
+                image_archive = objarr(dir_num)
+                image_archive[0] = obj_new('image') ;create new image object
+                image_archive[0]->set_image, new_image
+                image_archive[0]->set_name, filename
+                image_archive[0]->set_header, head
                 newimage = 1 
              endelse
           endif else begin
-             image_archive[state.num_images,*,*] = new_image
-             imagename_archive[state.num_images] = filename
+             image_archive[state.num_images] = obj_new('image') ;create new image object
+             image_archive[state.num_images]->set_image, new_image
+             image_archive[state.num_images]->set_name, filename
+             image_archive[state.num_images]->set_header, head
              state.num_images++
-             phast_add_header,head
           endelse
        endelse
    
 endif else begin                ;handle image refresh
-   image_archive[refresh,*,*] = new_image
-   imagename_archive[refresh] = filename
-                                ; imagehead_archive[refresh,*] = head
-   phast_add_header,head,refresh_index = refresh ,/refresh_toggle
+   image_archive[refresh]->set_image, new_image
+   image_archive[refresh]->set_name, filename
+   image_archive[refresh]->set_header, head
    newimage = 1
 endelse
 
@@ -1201,7 +1173,7 @@ endelse
 ;format filenames for dropdown box
    short_names = strarr(state.num_images)
    for i=0, state.num_images-1 do begin
-      temp = strsplit(imagename_archive[i],'/\.',count=count,/extract)
+      temp = strsplit(image_archive[i]->get_name(),'/\.',count=count,/extract)
       short_names[i] = temp[count-2]
    end
    widget_control,state.image_select_id,set_value=short_names
@@ -1209,72 +1181,72 @@ end
 
 
 ;--------------------------------------------------------------------
-pro phast_add_header,head,refresh_toggle=refresh_toggle, refresh_index = refresh
+;;pro phast_add_header,head,refresh_toggle=refresh_toggle, refresh_index = refresh
 ;routine to add fits headers to the header archive.  If the headers are not the
 ;same size, the archive is resized to the largest entry and empty
 ;strings are placed in the remaining entries
 
-common phast_images
-common phast_state
+;; common phast_images
+;; common phast_state
 
-temp = imagehead_archive
-if not keyword_set(refresh_toggle) then begin ;is this a header being refreshed?
-    if n_elements(head) eq n_elements(imagehead_archive[0,*]) then begin
-        imagehead_archive = strarr(state.num_images,n_elements(head))
-        for i=0, state.num_images-2 do imagehead_archive[i,*] = temp[i,*]
-        imagehead_archive[state.num_images-1,*] = head
-    endif
+;; temp = imagehead_archive
+;; if not keyword_set(refresh_toggle) then begin ;is this a header being refreshed?
+;;     if n_elements(head) eq n_elements(imagehead_archive[0,*]) then begin
+;;         imagehead_archive = strarr(state.num_images,n_elements(head))
+;;         for i=0, state.num_images-2 do imagehead_archive[i,*] = temp[i,*]
+;;         imagehead_archive[state.num_images-1,*] = head
+;;     endif
     
-    if n_elements(head) lt n_elements(imagehead_archive[0,*]) then begin
-        imagehead_archive = strarr(state.num_images,n_elements(imagehead_archive[0,*]))
-        for i=0, state.num_images-2 do imagehead_archive[i,*] = temp[i,*]
-        for i=0, n_elements(head)-1 do imagehead_archive[state.num_images-1,i] = head[i]
-        for i=n_elements(head),n_elements(imagehead_archive[0,*])-1 do imagehead_archive[state.num_images-1,i] = "" 
-    endif
+;;     if n_elements(head) lt n_elements(imagehead_archive[0,*]) then begin
+;;         imagehead_archive = strarr(state.num_images,n_elements(imagehead_archive[0,*]))
+;;         for i=0, state.num_images-2 do imagehead_archive[i,*] = temp[i,*]
+;;         for i=0, n_elements(head)-1 do imagehead_archive[state.num_images-1,i] = head[i]
+;;         for i=n_elements(head),n_elements(imagehead_archive[0,*])-1 do imagehead_archive[state.num_images-1,i] = "" 
+;;     endif
     
-    if n_elements(head) gt n_elements(imagehead_archive[0,*]) then begin
-        imagehead_archive = strarr(state.num_images,n_elements(head))
-        for i=0,state.num_images-2 do begin
-            for j=0,n_elements(temp[0,*])-1 do begin
-                imagehead_archive[i,j] = temp[i,j]
-            endfor
-        endfor
-        for i=0,state.num_images-2 do begin
-            for j=n_elements(temp[0,*])-1,n_elements(head)-1 do imagehead_archive[i,j] = ""
-        endfor
-        imagehead_archive[state.num_images-1,*] = head
-    endif
+;;     if n_elements(head) gt n_elements(imagehead_archive[0,*]) then begin
+;;         imagehead_archive = strarr(state.num_images,n_elements(head))
+;;         for i=0,state.num_images-2 do begin
+;;             for j=0,n_elements(temp[0,*])-1 do begin
+;;                 imagehead_archive[i,j] = temp[i,j]
+;;             endfor
+;;         endfor
+;;         for i=0,state.num_images-2 do begin
+;;             for j=n_elements(temp[0,*])-1,n_elements(head)-1 do imagehead_archive[i,j] = ""
+;;         endfor
+;;         imagehead_archive[state.num_images-1,*] = head
+;;     endif
 
-endif else begin ;handle refreshed images
+;; endif else begin ;handle refreshed images
 
-    if n_elements(head) eq n_elements(imagehead_archive[0,*]) then begin
-        imagehead_archive[refresh,*] = head
-    endif
+;;     if n_elements(head) eq n_elements(imagehead_archive[0,*]) then begin
+;;         imagehead_archive[refresh,*] = head
+;;     endif
     
-    if n_elements(head) lt n_elements(imagehead_archive[0,*]) then begin
-        for i=0, n_elements(head)-1 do imagehead_archive[refresh,i] = head[i]
-        for i=n_elements(head),n_elements(imagehead_archive[0,*])-1 do imagehead_archive[refresh,i] = "" 
-    endif
+;;     if n_elements(head) lt n_elements(imagehead_archive[0,*]) then begin
+;;         for i=0, n_elements(head)-1 do imagehead_archive[refresh,i] = head[i]
+;;         for i=n_elements(head),n_elements(imagehead_archive[0,*])-1 do imagehead_archive[refresh,i] = "" 
+;;     endif
     
-    if n_elements(head) gt n_elements(imagehead_archive[0,*]) then begin
-        imagehead_archive = strarr(state.num_images,n_elements(head))
-        for i=0,refresh-1 do begin ;elements up to refreshed index
-            for j=0,n_elements(temp[0,*])-1 do begin
-                imagehead_archive[i,j] = temp[i,j]
-            endfor
-            for j=n_elements(temp[0,*])-1,n_elements(head)-1 do imagehead_archive[i,j] = ""
-        endfor
-        imagehead_archive[refresh,*] = head ;refreshed image
-        for i=refresh+1,state.num_images-1 do begin ;elements after refreshed index
-            for j=0,n_elements(temp[0,*])-1 do begin
-                imagehead_archive[i,j] = temp[i,j]
-            endfor
-            for j=n_elements(temp[0,*])-1,n_elements(head)-1 do imagehead_archive[i,j] = ""
-        endfor        
-    endif    
-endelse
+;;     if n_elements(head) gt n_elements(imagehead_archive[0,*]) then begin
+;;         imagehead_archive = strarr(state.num_images,n_elements(head))
+;;         for i=0,refresh-1 do begin ;elements up to refreshed index
+;;             for j=0,n_elements(temp[0,*])-1 do begin
+;;                 imagehead_archive[i,j] = temp[i,j]
+;;             endfor
+;;             for j=n_elements(temp[0,*])-1,n_elements(head)-1 do imagehead_archive[i,j] = ""
+;;         endfor
+;;         imagehead_archive[refresh,*] = head ;refreshed image
+;;         for i=refresh+1,state.num_images-1 do begin ;elements after refreshed index
+;;             for j=0,n_elements(temp[0,*])-1 do begin
+;;                 imagehead_archive[i,j] = temp[i,j]
+;;             endfor
+;;             for j=n_elements(temp[0,*])-1,n_elements(head)-1 do imagehead_archive[i,j] = ""
+;;         endfor        
+;;     endif    
+;; endelse
   
-end
+;; end
 
 ;--------------------------------------------------------------------
 
@@ -1417,7 +1389,7 @@ case event_name of
         if result eq 'Yes' then spawn, 'rm ./output/images/*'
     end
     'Refresh current image': phast_refresh_image,state.current_image_index,state.imagename
-    'Refresh all images': for i=0, state.num_images-1 do phast_refresh_image,i,imagename_archive[i]
+    'Refresh all images': for i=0, state.num_images-1 do phast_refresh_image,i,image_archive[i]->get_name()
     'Quit':     if (state.activator EQ 0) then phast_shutdown $
       else state.activator = 0
 ; ColorMap menu options:            
@@ -1549,6 +1521,10 @@ case event_name of
     'USNOA2': state.catalog_name = 'USNOA2'
     'UCAC2': state.catalog_name = 'UCAC2'
     'MPC report': phast_mpc_report
+    ;Filter options
+    'Blue': state.filter_color = 'Blue'
+    'Visible': state.filter_color = 'Visible'
+    'Red': state.filter_color = 'Red'
 ;Pipeline options
     'Calibration': phast_calibrate_image
     'SExtractor': phast_sextractor
@@ -1814,7 +1790,7 @@ pro phast_read_vicar, file, newimage=newimage
 common phast_state
 common phast_images
 
-image = read_vicar(file,label,/silent) ;read the image
+image = read_vicar(file,label) ;read the image
 
 phast_add_image,image,file, '', newimage=newimage ;omit label for now
 main_image = reform(image_archive[state.current_image_index,*,*])
@@ -1832,7 +1808,7 @@ duration = state.animate_duration
 for j=0,duration do begin
     for i=0,state.num_images-1 do begin
         wait,state.animate_speed
-        main_image = reform(image_archive[i,*,*])
+        main_image = image_archive[i]->get_image()
         phast_displayall
     endfor
 endfor
@@ -2435,6 +2411,69 @@ widget_control, state.draw_base_id, /input_focus
 
 end
 ;----------------------------------------------------------------------
+pro image__define
+
+;class definition for image class
+
+struct = {image,$
+          image: ptr_new(),$
+          header:ptr_new(),$
+          name:ptr_new()$
+          }
+end
+;----------------------------------------------------------------------
+function image::init
+
+;constructor for image class
+
+  self.image = ptr_new(/allocate)
+  self.header = ptr_new(/allocate)
+  self.name = ptr_new(/allocate)
+  return,1
+end
+;----------------------------------------------------------------------
+function image::get_header
+
+;routine to get header from image object
+
+  return, *(self.header)
+end
+;----------------------------------------------------------------------
+pro image::set_header, header
+
+;routine to set header of image object
+
+  *(self.header) = header
+end
+;----------------------------------------------------------------------
+function image::get_image
+
+;routine to get image from image object
+
+  return, *(self.image)
+end
+;----------------------------------------------------------------------
+pro image::set_image, image
+
+;routine to set image of image object
+
+  *(self.image) = image
+end
+;----------------------------------------------------------------------
+function image::get_name
+
+;routine to get image name from image object
+
+  return, *(self.name)
+end
+;----------------------------------------------------------------------
+pro image::set_name, name
+
+;routine to set image name for image object
+
+  *(self.name) = name
+end
+;----------------------------------------------------------------------
 function phast_get_image_offset, index = index, ref_index = ref,round=round
 
 ;function to return the x,y offset between an image and the reference
@@ -2446,7 +2485,7 @@ common phast_state
 if not keyword_set(index) then index = state.current_image_index
 if not keyword_set(ref_index) then ref = 0
 if state.num_images gt 0 then begin
-    xyxy,reform(imagehead_archive(index,*)),reform(imagehead_archive(ref,*)),0,0,x,y
+    xyxy,image_archive[index]->get_header(),image_archive[ref]->get_header(),0,0,x,y
     offset = [x,y]
     if keyword_set(round) then offset = round(offset)
     return, offset
@@ -2454,34 +2493,37 @@ endif else return, [0,0]
 end
 
 ;----------------------------------------------------------------------
-function  phast_get_stars
+function phast_get_stars, a, d, catalog_name=catalog_name
 
 ;routine to retrieve stars from an outside catalog and return
 ;parameters in the result as follows:
 ;result[0.*] = name
 ;result[1,*] = ra
 ;result[2,*] = dec
-;result[3,*] = mag
+;result[3,*] = blue mag
+;result[4,*] = clear mag
+;result[5.*] = red mag
 
 common phast_state
 
+if not keyword_set(catalog_name) then catalog_name = state.catalog_name
+result = -1
 
-if state.catalog_loaded eq 0 then begin
-   widget_control,/hourglass    ;initial load could take some time
-   if state.catalog_name eq 'USNO-B1.0' then begin
-      star_catalog = queryvizier('USNO-B1',[a,d],10)
-      result = strarr(4,n_elements(star_catalog.B1MAG))
-      result[0,*] = star_catalog.USNO_B1_0
-      result[1,*] = star_catalog.RAJ2000
-      result[2,*] = star_catalog.DEJ2000
-      result[3,*] = star_catalog.B1MAG
-   endif
-   if state.catalog_name eq 'GSC 2.3' then begin
-      star_catalog = queryvizier('GSC2.3',[a,],10)
-   endif
-   state.catalog_loaded = 1
-end
-return result
+widget_control,/hourglass       ;initial load could take some time
+if catalog_name eq 'USNO-B1.0' then begin
+   star_catalog = queryvizier('USNO-B1',[a,d],10) ;10 arcmin radius
+   result = strarr(6,n_elements(star_catalog.B1MAG))
+   result[0,*] = star_catalog.USNO_B1_0
+   result[1,*] = star_catalog.RAJ2000
+   result[2,*] = star_catalog.DEJ2000
+   result[3,*] = star_catalog.B1MAG
+   result[5,*] = star_catalog.R1MAG
+endif
+if catalog_name eq 'GSC 2.3' then begin
+   star_catalog = queryvizier('GSC2.3',[a,d],10)
+endif
+state.catalog_loaded = 1
+return, result
 end
 ;----------------------------------------------------------------------
 
@@ -2495,24 +2537,19 @@ common phast_images
 common phast_pdata
 
 if ptr_valid(state.astr_ptr) then begin
-    xy2ad,512,512,*(state.astr_ptr),a,d
-    if state.catalog_loaded eq 0 then begin
-        widget_control,/hourglass ;initial load could take some time
-        star_catalog = queryvizier('USNO-B1',[a,d],10)
-        state.catalog_loaded = 1
-    end
+    xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a,d
+    star_catalog = phast_get_stars(a,d)
     phasterase
-    mag = star_catalog.B1MAG
-    ra = star_catalog.RAJ2000
-    dec = star_catalog.DEJ2000
-    name = star_catalog.USNO_B1_0
+    mag = reform(star_catalog[3,*]) ;choose blue mag
+    ra = reform(star_catalog[1,*])
+    dec = reform(star_catalog[2,*])
+    name = reform(star_catalog[0,*])
     limit = state.mag_limit
     ad2xy,ra[where(mag lt limit)],dec[where(mag lt limit)],*(state.astr_ptr),x,y
     name = name[where(mag lt limit)]
     x1 = x[where(x gt 0 and x lt state.image_size[0] and y gt 0 and y lt state.image_size[1])]
     y1 = y[where(x gt 0 and x lt state.image_size[0] and y gt 0 and y lt state.image_size[1])]
     name1 = name[where(x gt 0 and x lt state.image_size[0] and y gt 0 and y lt state.image_size[1])]
-   ; phastxyouts,x1,y1,'.',charsize=5,alignment=0.5,color='blue'
     for i = 0, n_elements(x1)-1 do begin
         if nplot lt maxplot then begin
             nplot++
@@ -2643,11 +2680,11 @@ if state.num_images gt 1 then begin
     end
 
 
-    main_image = reform(image_archive[state.current_image_index,*,*])
-    state.imagename  = imagename_archive[state.current_image_index]
-    phast_setheader, reform(imagehead_archive[state.current_image_index,*])
+    main_image = image_archive[state.current_image_index]->get_image()
+    state.imagename  = image_archive[state.current_image_index]->get_name()
+    phast_setheader, image_archive[state.current_image_index]->get_header()
     counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
-    temp = strsplit(imagename_archive[state.current_image_index],'/\',count=count,/extract)
+    temp = strsplit(image_archive[state.current_image_index]->get_name(),'/\',count=count,/extract)
     state.sex_catalog_path = ""
     for i=0,count-2 do begin
         state.sex_catalog_path += '/'
@@ -2685,9 +2722,9 @@ common phast_state
 common phast_images
 if state.num_images gt 0 then begin
     state.current_image_index = index
-    main_image = reform(image_archive[state.current_image_index,*,*])
-    state.imagename  = imagename_archive[state.current_image_index]
-    phast_setheader, reform(imagehead_archive[state.current_image_index,*])
+    main_image = image_archive[state.current_image_index]->get_image()
+    state.imagename  = image_archive[state.current_image_index]->get_name()
+    phast_setheader, image_archive[state.current_image_index]->get_header()
     counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
 ;update widgets
     widget_control,state.image_counter_id,set_value= counter_string
@@ -2774,7 +2811,7 @@ phast_setwindow, state.pan_pixmap
 erase
 tv, pan_image, state.pan_offset[0], state.pan_offset[1]
 if ptr_valid(state.astr_ptr) then begin 
-    arrows,reform(imagehead_archive[state.current_image_index,*]),60,60
+    arrows,image_archive[state.current_image_index]->get_header(),60,60
 endif
 phast_resetwindow
 
@@ -2782,7 +2819,7 @@ phast_setwindow, state.pan_window_id
 if (not(keyword_set(fast))) then erase
 tv, pan_image, state.pan_offset[0], state.pan_offset[1]
 if ptr_valid(state.astr_ptr) then begin    ;stop
-    arrows,reform(imagehead_archive[state.current_image_index,*]),60,60
+    arrows,image_archive[state.current_image_index]->get_header(),60,60
 endif
 
 phast_resetwindow
@@ -3651,7 +3688,7 @@ common phast_images
 ; Since this can take some time for a big image, set the cursor 
 ; to an hourglass until control returns to the event loop.
 ;widget_control, /hourglass
-
+ 
 scaled_image=0
 
 case state.scaling of
@@ -10975,8 +11012,9 @@ widget_control,/hourglass
 
 case state.batch_source of
     0: begin
-        filelist = imagename_archive
         num_files = state.num_images
+        filelist = strarr(num_files)
+        for i=0, num_files-1 do filelist[i] = image_archive[i]->get_name()
     end
     1: filelist = findfile(state.sex_catalog_path+'*.fits',count=num_files)
 endcase
@@ -11527,7 +11565,7 @@ pro phast_do_scamp, cat_name = cat_name, flags = flags
 
 common phast_state
 
-if not keyword_set(cat_name) then cat_name = state.scamp_cat_name
+if not keyword_set(cat_name) then cat_name = state.scamp_catalog_name
 if not keyword_set(flags) then flags = ''
 
 widget_control,/hourglass
@@ -13054,4 +13092,3 @@ endif
 
 
 end
-
