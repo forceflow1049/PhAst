@@ -3,3 +3,4 @@
 -wrote new procedure for reading online catalogs to allow for flexibility in catalog choice [Morgan Rehnberg]
 -images are now stored as objects.  This fixes the same-size image requirement [Morgan Rehnberg]
 -applied image offset to tracking image and mouse clicking.  Resolves object not appearing where it should. [Morgan Rehnberg]
+-FITS and VICAR images can now be opened in the same session.  Most features still do not work with VICAR images [Morgan Rehnberg]
