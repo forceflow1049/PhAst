@@ -1115,7 +1115,7 @@ if not keyword_set(refresh_toggle) then begin ;normal image adding
          temp_arr = image_archive
          image_archive = objarr(state.num_images)
          for i=0, state.num_images-2 do image_archive[i] = temp_arr[i]
-         image_archive[state.num_images-1] = obj_new('image') ;create new image object
+         image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
          image_archive[state.num_images-1]->set_image, new_image
          image_archive[state.num_images-1]->set_name, filename
          image_archive[state.num_images-1]->set_header, head
@@ -1124,12 +1124,12 @@ if not keyword_set(refresh_toggle) then begin ;normal image adding
       endif else begin          ;handle first image add
          state.num_images++
          image_archive = objarr(1)
-          image_archive[0] = obj_new('image') ;create new image object
-          image_archive[0]->set_image, new_image
-          image_archive[0]->set_name, filename
-          image_archive[0]->set_header, head
-          newimage = 1 
-       endelse
+         image_archive[0] = obj_new('phast_image') ;create new image object
+         image_archive[0]->set_image, new_image
+         image_archive[0]->set_name, filename
+         image_archive[0]->set_header, head
+         newimage = 1 
+      endelse
    endif else begin             ;handle directory add
       if keyword_set(dir_num) then begin
              if state.num_images gt 0 then begin
@@ -1137,7 +1137,7 @@ if not keyword_set(refresh_toggle) then begin ;normal image adding
                 
                 image_archive = objarr(state.num_images+dir_num)
                 for i=0, state.num_images-2 do image_archive[i] = temp_image[i]
-                image_archive[state.num_images] = obj_new('image') ;create new image object
+                image_archive[state.num_images] = obj_new('phast_image') ;create new image object
                 image_archive[state.num_images]->set_image, new_image
                 image_archive[state.num_images]->set_name, filename
                 image_archive[state.num_images]->set_header, head
@@ -1145,14 +1145,14 @@ if not keyword_set(refresh_toggle) then begin ;normal image adding
              endif else begin   ;handle first image add
                 state.num_images++
                 image_archive = objarr(dir_num)
-                image_archive[0] = obj_new('image') ;create new image object
+                image_archive[0] = obj_new('phast_image') ;create new image object
                 image_archive[0]->set_image, new_image
                 image_archive[0]->set_name, filename
                 image_archive[0]->set_header, head
                 newimage = 1 
              endelse
           endif else begin
-             image_archive[state.num_images] = obj_new('image') ;create new image object
+             image_archive[state.num_images] = obj_new('phast_image') ;create new image object
              image_archive[state.num_images]->set_image, new_image
              image_archive[state.num_images]->set_name, filename
              image_archive[state.num_images]->set_header, head
@@ -2411,67 +2411,82 @@ widget_control, state.draw_base_id, /input_focus
 
 end
 ;----------------------------------------------------------------------
-pro image__define
+pro phast_image__define
 
 ;class definition for image class
 
-struct = {image,$
-          image: ptr_new(),$
-          header:ptr_new(),$
-          name:ptr_new()$
+struct = {phast_image,$
+          image: ptr_new(),$ ;array which holds the image data
+          header:ptr_new(),$ ;holds the image header
+          name:ptr_new(),$   ;holds the file path to the image
+          size:ptr_new()$    ;contains the size of the image: [x,y]
           }
 end
 ;----------------------------------------------------------------------
-function image::init
+function phast_image::init
 
 ;constructor for image class
 
   self.image = ptr_new(/allocate)
   self.header = ptr_new(/allocate)
   self.name = ptr_new(/allocate)
+  self.size = ptr_new(/allocate)
   return,1
 end
 ;----------------------------------------------------------------------
-function image::get_header
+function phast_image::get_header
 
 ;routine to get header from image object
 
   return, *(self.header)
 end
 ;----------------------------------------------------------------------
-pro image::set_header, header
+pro phast_image::set_header, header
 
 ;routine to set header of image object
 
   *(self.header) = header
 end
 ;----------------------------------------------------------------------
-function image::get_image
+function phast_image::get_image
 
 ;routine to get image from image object
 
   return, *(self.image)
 end
 ;----------------------------------------------------------------------
-pro image::set_image, image
+pro phast_image::set_image, image
 
 ;routine to set image of image object
 
   *(self.image) = image
+  image_size= size(image)
+  *(self.size) = [image_size[2],image_size[3]]
 end
 ;----------------------------------------------------------------------
-function image::get_name
+function phast_image::get_name
 
 ;routine to get image name from image object
 
   return, *(self.name)
 end
 ;----------------------------------------------------------------------
-pro image::set_name, name
+pro phast_image::set_name, name
 
 ;routine to set image name for image object
 
   *(self.name) = name
+end
+;----------------------------------------------------------------------
+function phast_image::get_size,x=x,y=y
+
+;routine to return size of image
+
+if not keyword_set(x) and not keyword_set(y) then return, *(self.size)
+if keyword_set(x) and keyword_set(y) then return, *(self.size)
+if keyword_set(x) then return, *(self.size)[0]
+if keyword_set(y) then return, *(self.size)[1]
+
 end
 ;----------------------------------------------------------------------
 function phast_get_image_offset, index = index, ref_index = ref,round=round
@@ -2505,12 +2520,14 @@ function phast_get_stars, a, d, catalog_name=catalog_name
 ;result[5.*] = red mag
 
 common phast_state
+common phast_images
 
 if not keyword_set(catalog_name) then catalog_name = state.catalog_name
 result = -1
 
 widget_control,/hourglass       ;initial load could take some time
-if catalog_name eq 'USNO-B1.0' then begin
+case catalog_name of
+'USNO-B1.0': begin
    star_catalog = queryvizier('USNO-B1',[a,d],10) ;10 arcmin radius
    result = strarr(6,n_elements(star_catalog.B1MAG))
    result[0,*] = star_catalog.USNO_B1_0
@@ -2518,10 +2535,17 @@ if catalog_name eq 'USNO-B1.0' then begin
    result[2,*] = star_catalog.DEJ2000
    result[3,*] = star_catalog.B1MAG
    result[5,*] = star_catalog.R1MAG
-endif
-if catalog_name eq 'GSC 2.3' then begin
+end 
+'GSC 2.3': begin
    star_catalog = queryvizier('GSC2.3',[a,d],10)
-endif
+   result = strarr(6,n_elements(star_catalog.GSC2_3))
+   result[0,*] = star_catalog.GSC2_3
+   result[1,*] = star_catalog.RAJ2000
+   result[2,*] = star_catalog.DEJ2000
+   result[3,*] = star_catalog.jmag
+   result[5,*] = star_catalog.fmag
+end
+endcase
 state.catalog_loaded = 1
 return, result
 end
@@ -2538,11 +2562,11 @@ common phast_pdata
 
 if ptr_valid(state.astr_ptr) then begin
     xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a,d
-    star_catalog = phast_get_stars(a,d)
+    star_catalog = phast_get_stars(a,d,catalog_name='USNO-B1.0')
     phasterase
-    mag = reform(star_catalog[3,*]) ;choose blue mag
-    ra = reform(star_catalog[1,*])
-    dec = reform(star_catalog[2,*])
+    mag = float(reform(star_catalog[3,*])) ;choose blue mag
+    ra = float(reform(star_catalog[1,*]))
+    dec = float(reform(star_catalog[2,*]))
     name = reform(star_catalog[0,*])
     limit = state.mag_limit
     ad2xy,ra[where(mag lt limit)],dec[where(mag lt limit)],*(state.astr_ptr),x,y
@@ -2577,15 +2601,11 @@ widget_control,state.star_search_widget_id,get_value=term
 
 
 if ptr_valid(state.astr_ptr) then begin
-    xy2ad,512,512,*(state.astr_ptr),a,d
-    if state.catalog_loaded eq 0 then begin
-        widget_control,/hourglass ;initial load could take some time
-        star_catalog = queryvizier('USNO-B1',[a,d],10)
-        state.catalog_loaded = 1
-    end
-    ra = star_catalog.RAJ2000
-    dec = star_catalog.DEJ2000
-    name = star_catalog.USNO_B1_0
+    xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a,d
+    star_catalog = phast_get_stars(a,d,catalog_name='USNO-B1.0')
+    ra = float(reform(star_catalog[1,*]))
+    dec = float(reform(star_catalog[2,*]))
+    name = reform(star_catalog[0,*])
     ad2xy,ra,dec,*(state.astr_ptr),x,y
     x1 = x[where(x gt 0 and x lt state.image_size[0] and y gt 0 and y lt state.image_size[1])]
     y1 = y[where(x gt 0 and x lt state.image_size[0] and y gt 0 and y lt state.image_size[1])]
@@ -3513,9 +3533,13 @@ pro phast_gettrack
 common phast_state
 common phast_images
 
-; Get x and y for center of track window
+;get image offset 
+offset = [0,0]
+if state.align_toggle eq 1 then offset = phast_get_image_offset()
 
-zcenter = (0 > state.coord < state.image_size)
+; Get x and y for center of track window, correcting for offset
+zcenter = (0 > state.coord < state.image_size) - offset
+
 
 track = bytarr(11,11)
 boxsize=5
@@ -10781,32 +10805,28 @@ for i=0, n_elements(temp)-1 do begin
 endfor
 
 
-;load catalog if needed
 if ptr_valid(state.astr_ptr) then begin
-    if state.catalog_loaded eq 0 then begin
-        xy2ad,512,512,*(state.astr_ptr),a,d
-        star_catalog = queryvizier('USNO-B1',[a,d],10)
-        state.catalog_loaded = 1
-    endif
-    cat_ra = star_catalog.RAJ2000
-    cat_dec = star_catalog.DEJ2000
-    cat_mag = star_catalog.R1MAG
-    mag_closest = dblarr(n_elements(im_ra)) ;will hold the R magnitude of closest star
-    
-    for i=0, n_elements(im_ra)-1 do begin ;cycle detected objects
-        closest_dist = 1.0 ;(in deg)
-        closest_index = -1
-        for j=0, n_elements(cat_ra)-1 do begin
-            dist = sqrt((cat_ra[j]-im_ra[i])^2 + (cat_dec[j]-im_dec[i])^2)
-            if dist lt closest_dist and dist lt 0.00027 and cat_mag[j] lt 22 then begin ;must be within 1 arcsec
-                closest_dist = dist
-                closest_index = j
-            endif
-        endfor
-        if closest_index ne -1 then begin
-            mag_closest[i] = cat_mag[closest_index]
-        endif else mag_closest[i]  = -9999
-    endfor
+   xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a,d
+   star_catalog = phast_get_stars(a,d,catalog_name='USNO-B1.0')
+   cat_ra = float(reform(star_catalog[1,*]))
+   cat_dec = float(reform(star_catalog[2,*]))
+   cat_mag = float(reform(star_catalog[5,*])) ;choose red mag
+   mag_closest = dblarr(n_elements(im_ra))    ;will hold the R magnitude of closest star
+   
+   for i=0, n_elements(im_ra)-1 do begin ;cycle detected objects
+      closest_dist = 1.0                 ;(in deg)
+      closest_index = -1
+      for j=0, n_elements(cat_ra)-1 do begin
+         dist = sqrt((cat_ra[j]-im_ra[i])^2 + (cat_dec[j]-im_dec[i])^2)
+         if dist lt closest_dist and dist lt 0.00027 and cat_mag[j] lt 22 and flux[i] lt 22 then begin ;must be within 1 arcsec
+            closest_dist = dist
+            closest_index = j
+         endif
+      endfor
+      if closest_index ne -1 then begin
+         mag_closest[i] = cat_mag[closest_index]
+      endif else mag_closest[i]  = -9999
+   endfor
 endif
 ;find any NaN values and -9999 values
 count=0
@@ -11843,7 +11863,10 @@ pro phast_apphot
 
 common phast_state
 
-state.cursorpos = state.coord
+offset = [0,0]
+if state.align_toggle eq 1 then offset = phast_get_image_offset()
+
+state.cursorpos = state.coord - offset
 
 if (not (xregistered('phast_apphot', /noshow))) then begin
 

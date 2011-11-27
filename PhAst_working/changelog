@@ -2,3 +2,4 @@
 -added inital test support for VICAR images. [Morgan Rehnberg]
 -wrote new procedure for reading online catalogs to allow for flexibility in catalog choice [Morgan Rehnberg]
 -images are now stored as objects.  This fixes the same-size image requirement [Morgan Rehnberg]
+-applied image offset to tracking image and mouse clicking.  Resolves object not appearing where it should. [Morgan Rehnberg]
