@@ -1,4 +1,4 @@
--added update checker.  Help>Check for Updates will now check whether a new version has been released.
+-added update checker.  Help>Check for Updates will now check whether a new version has been released. [Morgan Rehnberg]
 -added more robust support for image rotation.  Rotation is now retained when switching between images [Morgan Rehnberg]
 -fixed bugs relating to directory loading. Also fixed minor name display bug for all image adds [Morgan Rehnberg]
 -improved memory management.  Object pointers should now release memory on object destruction [Morgan Rehnberg]
