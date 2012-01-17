@@ -1,6 +1,4 @@
--Increased file import speed greatly by reducing number of array resizes for image archive. [Morgan Rehnberg]
--added inital test support for VICAR images. [Morgan Rehnberg]
--wrote new procedure for reading online catalogs to allow for flexibility in catalog choice [Morgan Rehnberg]
--images are now stored as objects.  This fixes the same-size image requirement [Morgan Rehnberg]
--applied image offset to tracking image and mouse clicking.  Resolves object not appearing where it should. [Morgan Rehnberg]
--FITS and VICAR images can now be opened in the same session.  Most features still do not work with VICAR images [Morgan Rehnberg]
+-added update checker.  Help>Check for Updates will now check whether a new version has been released.
+-added more robust support for image rotation.  Rotation is now retained when switching between images [Morgan Rehnberg]
+-fixed bugs relating to directory loading. Also fixed minor name display bug for all image adds [Morgan Rehnberg]
+-improved memory management.  Object pointers should now release memory on object destruction [Morgan Rehnberg]
