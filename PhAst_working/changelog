@@ -4,3 +4,37 @@
 -images are now stored as objects.  This fixes the same-size image requirement [Morgan Rehnberg]
 -applied image offset to tracking image and mouse clicking.  Resolves object not appearing where it should. [Morgan Rehnberg]
 -FITS and VICAR images can now be opened in the same session.  Most features still do not work with VICAR images [Morgan Rehnberg]
+
+11/30/2011 RWC
+
+Zeropoint ack window ("successful") changed to report zeropoint result.
+
+Photometric catalog distinguished from astrometric catalog.
+Catalog access routine changed to reference GSC 2.3.2 as GSC-2.3.
+We should follow the SCAMP documentation on naming catalogs, which follows Vizier.
+
+12/04/2011
+
+phast_calculate_zeropoint rewritten to use regression technique to estimate
+zeropoint and color term.  But, we cannot use the new zeropoint in measurements
+yet because there is no way to account for the color term
+
+Some miscellaneous changes have been made throughout in the process.
+
+12/10/2011
+
+Changes made to image and calibration areas of batch processing menu to improve
+human factors and for training on IDL widget use.  In process, have found that a
+sextractor directory variable was being used for the batch processing directory.
+I created a state.batch_dirname variable and used it in batch processing code.
+
+12/XX/2011
+
+Modifications to coordinate zeropoint determination with Sextractor KRON photometry.
+1. state.sex_PHOT_AUTOPARAMS: [2.5, 0.0] defined and used to pass these values automatically
+   to sextractor when it is processing image for zeropoint determination.
+
+2. photometry menus revised to allow user to input color term for use in magnitude
+   calculation.  Either by selecting spectral type or by inputting color terms directly.
+
+3. main and photometry windows resized to accommodate added information.
