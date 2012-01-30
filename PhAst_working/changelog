@@ -2,3 +2,10 @@
 -added more robust support for image rotation.  Rotation is now retained when switching between images [Morgan Rehnberg]
 -fixed bugs relating to directory loading. Also fixed minor name display bug for all image adds [Morgan Rehnberg]
 -improved memory management.  Object pointers should now release memory on object destruction [Morgan Rehnberg]
+-Zeropoint ack window ("successful") changed to report zeropoint result. [Robert Crawford]
+-Photometric catalog distinguished from astrometric catalog.[Robert Crawford]
+-phast_calculate_zeropoint rewritten to use regression technique to estimate
+zeropoint and color term.[Robert Crawford]
+-Changes made to image and calibration areas of batch processing menu to improve
+human factors.[Robert Crawford]
+-Modifications to coordinate zeropoint determination with Sextractor KRON photometry.[Robert Crawford]
