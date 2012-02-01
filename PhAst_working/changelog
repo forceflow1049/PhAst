@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 -Increased file import speed greatly by reducing number of array resizes for image archive. [Morgan Rehnberg]
 -added inital test support for VICAR images. [Morgan Rehnberg]
 -wrote new procedure for reading online catalogs to allow for flexibility in catalog choice [Morgan Rehnberg]
@@ -38,3 +39,16 @@ Modifications to coordinate zeropoint determination with Sextractor KRON photome
    calculation.  Either by selecting spectral type or by inputting color terms directly.
 
 3. main and photometry windows resized to accommodate added information.
+=======
+-added update checker.  Help>Check for Updates will now check whether a new version has been released. [Morgan Rehnberg]
+-added more robust support for image rotation.  Rotation is now retained when switching between images [Morgan Rehnberg]
+-fixed bugs relating to directory loading. Also fixed minor name display bug for all image adds [Morgan Rehnberg]
+-improved memory management.  Object pointers should now release memory on object destruction [Morgan Rehnberg]
+-Zeropoint ack window ("successful") changed to report zeropoint result. [Robert Crawford]
+-Photometric catalog distinguished from astrometric catalog.[Robert Crawford]
+-phast_calculate_zeropoint rewritten to use regression technique to estimate
+zeropoint and color term.[Robert Crawford]
+-Changes made to image and calibration areas of batch processing menu to improve
+human factors.[Robert Crawford]
+-Modifications to coordinate zeropoint determination with Sextractor KRON photometry.[Robert Crawford]
+>>>>>>> 29d4834bed7d0e1eb40c3f6dbefe1e765e0f7ae0
