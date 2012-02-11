@@ -162,6 +162,8 @@ mpc = { $
         }
 
 state = {                   $
+        kernel_list: '', $      ;path to file with kernel list
+        spice_box_id: 0L, $     ;widget id for spice control box
         check_updates: 0, $     ;check for updates on startup? 1=yes
         filter_color: 'Blue', $ ;which filter for catalog photometry?
         image_type: 'FITS',  $  ;what kind of image is being viewed?
@@ -191,8 +193,12 @@ state = {                   $
         flat_select_id: 0L,$    ;widget id for flat cal select 
         bias_select_id: 0L,$    ;widget id for bias cal select
         search_msg_id:0L, $     ;widget id of search msg box
+        tb_spice_visible: 0, $  ;Are the SPICE controls shown?
+        tb_spice_toggle: 0, $   ;draw the SPICE controls?
         tb_blink_toggle: 1, $   ;is the blink base shown?
-        tb_overlay_toggle:0, $  ;is the overlay toolbox shown?
+        tb_blink_visible: 1, $  ;draw the blink base?
+        tb_overlay_toggle: 0, $ ;is the overlay toolbox shown?
+        tb_overlay_visible: 1, $ ;draw the overlay toolbox?
         overlay_stars_box_id: 0L,$ ;widget id for overlay box
         star_search_string:'',$ ;string containing serach terms
         star_search_widget_id:0L,$;widget id for search field
@@ -553,9 +559,15 @@ if file_test('phast.conf') eq 1 then begin
             ;blink control
             'animate_speed': state.animate_speed = float(val[i])
             'tb_blink_toggle': state.tb_blink_toggle = fix(val[i])
+            'tb_blink_visible': state.tb_blink_visible = fix(val[i])
             'animate_type': state.animate_type = val[i]
             ;star overlay
             'tb_overlay_toggle': state.tb_overlay_toggle = fix(val[i])
+            'tb_overlay_visible': state.tb_overlay_visible = fix(val[i])
+            ;SPICE control
+            'tb_spice_toggle': state.tb_spice_toggle = fix(val[i])
+            'tb_spice_visible': state.tb_spice_visible = fix(val[i])
+            'kernel_list': state.kernel_list = val[i]
             ;calibration
             'cal_file_name': state.cal_file_name = val[i]
             ;photometery
@@ -950,60 +962,73 @@ center_button = widget_button(button_base2, $
 ;                            uvalue = 'done')
 
 ;blink control
-blink_base_toggle = widget_button(left_pane,value='Blink Control',uvalue='blink_base_toggle')
-blink_base = widget_base(left_pane,/column,frame=4,/base_align_center,xsize=250)
-
+if state.tb_blink_visible eq 1 then begin
+   blink_base_toggle = widget_button(left_pane,value='Blink Control',uvalue='blink_base_toggle')
+   blink_base = widget_base(left_pane,/column,frame=4,/base_align_center,xsize=250)
+   
 ; NOTE: EVENTS RETURNED BY THE BLINK BASE LABEL ARE TIMER EVENTS FOR ANIMATION
-blink_base_label = widget_label(blink_base,value=' ',uvalue='blink_base_label',ysize=1,xsize=1)
-
-blink_nav_base = widget_base(blink_base,/row,/align_center)
-blink_first = widget_button(blink_nav_base,value='<--|',uvalue='blink_first',$
-                            tooltip='First image')
-blink_back = widget_button(blink_nav_base,value='<---',uvalue='blink_back',$
-                           tooltip='Previous image')
-blink_pause = widget_button(blink_nav_base,value='||',uvalue='blink_pause',$
-                            tooltip='Pause animation')
-blink_animate = widget_button(blink_nav_base,value='|>',uvalue='blink_animate',$
-                              tooltip='Start animation')
-
-blink_forward = widget_button(blink_nav_base,value='--->',uvalue='blink_forward',$
-                              tooltip='Next image')
-blink_last = widget_button(blink_nav_base,value='|-->',uvalue='blink_last',$
-                           tooltip='Last image')
-speed_label = widget_label(blink_base,value='Animate speed: '+strmid(strtrim(string(1/state.animate_speed),1),0,4)+' image/sec')
-speed_slider = widget_slider(blink_base,value=10/state.animate_speed,/drag,uvalue='speed_slider',$
-                             min=10,/suppress_value,xsize=244)
-animate_type_label = widget_label(blink_base,value='Select animation type')
-animate_type_box = widget_base(blink_base,/row,/exclusive)
-type_forward = widget_button(animate_type_box,value='Forward',uvalue='type_forward')
-type_backward = widget_button(animate_type_box,value='Backward',uvalue='type_backward')
-type_bounce = widget_button(animate_type_box, value='Bounce',uvalue='type_bounce')
+   blink_base_label = widget_label(blink_base,value=' ',uvalue='blink_base_label',ysize=1,xsize=1)
+   
+   blink_nav_base = widget_base(blink_base,/row,/align_center)
+   blink_first = widget_button(blink_nav_base,value='<--|',uvalue='blink_first',$
+                               tooltip='First image')
+   blink_back = widget_button(blink_nav_base,value='<---',uvalue='blink_back',$
+                              tooltip='Previous image')
+   blink_pause = widget_button(blink_nav_base,value='||',uvalue='blink_pause',$
+                               tooltip='Pause animation')
+   blink_animate = widget_button(blink_nav_base,value='|>',uvalue='blink_animate',$
+                                 tooltip='Start animation')
+   
+   blink_forward = widget_button(blink_nav_base,value='--->',uvalue='blink_forward',$
+                                 tooltip='Next image')
+   blink_last = widget_button(blink_nav_base,value='|-->',uvalue='blink_last',$
+                              tooltip='Last image')
+   speed_label = widget_label(blink_base,value='Animate speed: '+strmid(strtrim(string(1/state.animate_speed),1),0,4)+' image/sec')
+   speed_slider = widget_slider(blink_base,value=10/state.animate_speed,/drag,uvalue='speed_slider',$
+                                min=10,/suppress_value,xsize=244)
+   animate_type_label = widget_label(blink_base,value='Select animation type')
+   animate_type_box = widget_base(blink_base,/row,/exclusive)
+   type_forward = widget_button(animate_type_box,value='Forward',uvalue='type_forward')
+   type_backward = widget_button(animate_type_box,value='Backward',uvalue='type_backward')
+   type_bounce = widget_button(animate_type_box, value='Bounce',uvalue='type_bounce')
+   
+   state.speed_label_id = speed_label
+   state.blink_base_label_id = blink_base_label
+   state.blink_base_id = blink_base
+endif
 
 ;star overlay
-overlay_toggle = widget_button(left_pane,value='Overlay stars',uvalue='overlay_toggle')
-overlay_stars_box = widget_base(left_pane,/column,frame=4,xsize=250)
+if state.tb_overlay_visible eq 1 then begin
+   overlay_toggle = widget_button(left_pane,value='Overlay stars',uvalue='overlay_toggle')
+   overlay_stars_box = widget_base(left_pane,/column,frame=4,xsize=250)
 ;overlay_stars_label = widget_label(overlay_stars_box,value='Overlay Stars')
-overlay_sub_box = widget_base(overlay_stars_box,/row)
-mag_select_label = widget_label(overlay_sub_box,value='Mag limit:')
-mag_select = widget_text(overlay_sub_box,value='20',uvalue='mag_select',xsize=3,/editable,/all_events)
-stars_button_box = widget_base(overlay_sub_box,/nonexclusive)
-display_names = widget_button(stars_button_box,value='Names',uvalue='display_names',$
-                             tooltip='Display USNO-B1.0 designations')
-display_stars = widget_button(overlay_sub_box,value='Display',uvalue='display_stars',$
-                             tooltip='Overlay stars from USNO-B1.0 catalog')
-star_search_box = widget_base(overlay_stars_box,/row)
-search_field = widget_text(star_search_box,value='Search for a star...',uvalue='search_field',/editable)
-search_button = widget_button(star_search_box,value='Search',uvalue='search_button')
-search_notify = widget_label(overlay_stars_box,value='---------------',/dynamic_resize)
+   overlay_sub_box = widget_base(overlay_stars_box,/row)
+   mag_select_label = widget_label(overlay_sub_box,value='Mag limit:')
+   mag_select = widget_text(overlay_sub_box,value='20',uvalue='mag_select',xsize=3,/editable,/all_events)
+   stars_button_box = widget_base(overlay_sub_box,/nonexclusive)
+   display_names = widget_button(stars_button_box,value='Names',uvalue='display_names',$
+                                 tooltip='Display USNO-B1.0 designations')
+   display_stars = widget_button(overlay_sub_box,value='Display',uvalue='display_stars',$
+                                 tooltip='Overlay stars from USNO-B1.0 catalog')
+   star_search_box = widget_base(overlay_stars_box,/row)
+   search_field = widget_text(star_search_box,value='Search for a star...',uvalue='search_field',/editable)
+   search_button = widget_button(star_search_box,value='Search',uvalue='search_button')
+   search_notify = widget_label(overlay_stars_box,value='---------------',/dynamic_resize)
 
-state.mag_select_id = mag_select
-state.speed_label_id = speed_label
-state.blink_base_label_id = blink_base_label
-state.blink_base_id = blink_base
-state.star_search_widget_id = search_field
-state.overlay_stars_box_id = overlay_stars_box
-state.search_msg_id = search_notify
+   state.mag_select_id = mag_select
+   state.star_search_widget_id = search_field
+   state.overlay_stars_box_id = overlay_stars_box
+   state.search_msg_id = search_notify
+endif
 
+;SPICE controls
+if state.tb_spice_visible eq 1 then begin
+   spice_toggle = widget_button(left_pane,value='SPICE Control',uvalue='spice_toggle')
+   state.spice_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
+   spice_sub_box = widget_base(state.spice_box_id,/row)
+   check_moons = widget_button(spice_sub_box,value='Check Moons', uvalue='check_moons')
+
+endif
 
 ; Set widget y size for small screens
 state.draw_window_size[1] = state.draw_window_size[1] < $
@@ -1025,6 +1050,12 @@ state.colorbar_widget_id = widget_draw(state.colorbar_base_id, $
 
 widget_control, base, /realize
 widget_control, state.pan_widget_id, draw_motion_events = 0
+
+;set initial collapse states
+if state.tb_overlay_toggle eq 0 and state.tb_overlay_visible eq 1 then widget_control,state.overlay_stars_box_id,ysize=1
+if state.tb_blink_toggle eq 0 and state.tb_blink_visible eq 1 then widget_control,state.blink_base_id,ysize=1
+if state.tb_spice_toggle eq 0 and state.tb_spice_visible eq 1 then widget_control,state.spice_box_id,ysize=1
+
 
 ; get the window ids for the draw widgets
 
@@ -1073,10 +1104,6 @@ phast_colorbar
 widget_control, state.base_id, tlb_get_size=tmp_event
 state.base_pad = tmp_event - state.draw_window_size
 state.base_pad[1] = 20 ;set y pad staticlly
-
-;set initial box collapse
-if state.tb_overlay_toggle eq 0 then widget_control,state.overlay_stars_box_id,ysize=1
-if state.tb_blink_toggle eq 0 then widget_control,state.blink_base_id,ysize=1
 
 ;check for output directories
 if not (file_test('output',/directory) and file_test('output/images',/directory) and file_test('output/catalogs',/directory)) then begin
@@ -2439,6 +2466,18 @@ case uvalue of
     'search_field':
     'search_button': phast_search_stars
 
+;SPICE controls
+    'spice_toggle': begin
+       if state.tb_spice_toggle eq 0 then begin
+            widget_control,state.spice_box_id,ysize=35
+            state.tb_spice_toggle = 1
+        endif else begin
+            widget_control,state.spice_box_id,ysize=1
+            state.tb_spice_toggle = 0
+        endelse   
+     end
+    'check_moons': phast_check_moons
+
 ;align
     'align_toggle': begin
         if state.align_toggle eq 0 then begin
@@ -2741,6 +2780,23 @@ if ptr_valid(state.astr_ptr) then begin
 endif else begin
     widget_control,state.search_msg_id,set_value='WCS data not present'
 end
+
+end
+;----------------------------------------------------------------------
+pro phast_check_moons
+
+;routine to check the current VICAR image for moons with the SPICE
+;kernels
+
+common phast_state
+common phast_images
+
+;check that the ICY DLM is installed
+
+;load the SPICE kernels specified in state.kernel_list
+readcol,state.kernel_list,kernels, delimiter='|',format='A'
+cspice_furnsh,kernels
+
 
 end
 ;----------------------------------------------------------------------
