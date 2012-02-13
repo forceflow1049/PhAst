@@ -367,6 +367,7 @@ state = {                   $
         magunits: 0, $          ; 0=counts, 1=magnitudes
         skytype: 0, $           ; 0=idlphot,1=median,2=no sky subtract
         exptime: 1.0, $         ; exposure time for photometry
+        photautoaper: 0, $      ; 0=fixed aperatures; 1=auto aperture
         photcatalog_name: 'GSC-2.3',$ ;name of currently selected photometeric star cat
         photcatalog_loaded:0,$      ;has the photometric star catalog been loaded? 1=yes
         photzpt: 0.0,  $        ; magnitude zeropoint
@@ -406,9 +407,12 @@ state = {                   $
         ccdgain: 3.0, $         ; CCD gain
         ccdrn: 0.0, $           ; read noise
         centerboxsize: 9L, $    ; centering box size
-        aprad: 5.0, $           ; aperture photometry radius
-        innersky: 10.0, $       ; inner sky radius
-        outersky: 20.0, $       ; outer sky radius
+        aprad_def: 5.0, $       ; default aperture photometry radius
+        innersky_def: 10.0, $   ; default inner sky radius
+        outersky_def: 20.0, $   ; default outer sky radius
+        aprad: 5.0, $           ; aperture photometry radius (working)
+        innersky: 10.0, $       ; inner sky radius (working)
+        outersky: 20.0, $       ; outer sky radius (working)
         headinfo_base_id: 0L, $ ; headinfo base widget id
         pixtable_base_id: 0L, $ ; pixel table base widget id
         pixtable_tbl_id: 0L, $  ; pixel table widget_table id
@@ -10167,16 +10171,18 @@ repeat begin
           sky+0.07*(!y.crange[1] - sky), 'sky level', color=1, charsize=1.5
           
   ; reset the apertures
-  gaussSigma = fwhm/(2*sqrt(2*alog(2)))
-  case state.sex_PHOT_AUTOPARAMS[0] of
-    2.0 : state.aprad = gaussSigma*sqrt(-2*alog(1-0.90))
-    2.5 : state.aprad = gaussSigma*sqrt(-2*alog(1-0.94))
-    else: state.aprad = gaussSigma*sqrt(-2*alog(1-0.90))
-  endcase
-  state.aprad    = round( 100 * state.aprad                           ) / 100.0
-  state.innersky = round( 100 * gaussSigma*sqrt(-2*alog(1-0.9999))    ) / 100.0
-  state.outersky = round( 100 * sqrt( (!pi*state.innersky^2+100)/!pi) ) / 100.0
-  state.centerboxsize = 9 > round( 1.2*state.outersky )
+  if (state.photautoaper EQ 1) then begin
+    gaussSigma = fwhm/(2*sqrt(2*alog(2)))
+    case state.sex_PHOT_AUTOPARAMS[0] of
+      2.0 : state.aprad = gaussSigma*sqrt(-2*alog(1-0.90))
+      2.5 : state.aprad = gaussSigma*sqrt(-2*alog(1-0.94))
+      else: state.aprad = gaussSigma*sqrt(-2*alog(1-0.90))
+      endcase
+      state.aprad    = round( 100 * state.aprad                           ) / 100.0
+      state.innersky = round( 100 * gaussSigma*sqrt(-2*alog(1-0.9999))    ) / 100.0
+      state.outersky = round( 100 * sqrt( (!pi*state.innersky^2+100)/!pi) ) / 100.0
+      state.centerboxsize = 9 > round( 1.2*state.outersky )
+  endif
   
   phast_resetwindow
 endrep until (ipass eq maxpass)
@@ -10547,9 +10553,13 @@ skyline = ('0, button, IDLPhot Sky Mode|Median Sky|No Sky Subtraction,'+$
                       string(state.skytype))
 
 magline =  ('0, button, Pixels ADUs|Arcsecs Magnitudes, exclusive,' + $
-            'label_left = Select Output Units: , set_value =' + $
+            'label_left =Select Output Units: , set_value =' + $
             string(state.magunits))
 
+aperline =  ('0, button, Fixed Apertures|Auto Apertures, exclusive,' + $
+            'label_left =Select Aperture Sizes: , set_value =' + $
+            string(state.photautoaper))
+            
 zptline =  ('0, float,'+string(state.photzpt,'(F6.3)') + $
             ',label_left = Magnitude Zeropoint:,'  +  'width = 6')
 
@@ -10586,6 +10596,7 @@ warningline4 = $
 
 formdesc = [skyline,      $
             magline,      $
+            aperline,     $
             zptline,      $
             clrline,      $
             exptimeline,  $
@@ -10600,16 +10611,24 @@ formdesc = [skyline,      $
 textform = cw_form(formdesc, /column, $
                    title = 'phast photometry settings')
 
-if (textform.tag14 EQ 1) then return ; cancelled
+if (textform.tag15 EQ 1) then return ; cancelled
 
 state.skytype = textform.tag0
 state.magunits = textform.tag1
-state.photzpt = textform.tag2
-state.photclr = textform.tag3
-state.exptime = textform.tag4
-state.photerrors = textform.tag6
-state.ccdgain = (1.e-5) > textform.tag7
-state.ccdrn = 0 > textform.tag8
+if (state.photautoaper NE textform.tag2) then begin
+  if textform.tag2 EQ 0 then begin      ; return to defauult apertures
+    state.aprad = state.aprad_def
+    state.innersky = state.innersky_def
+    state.outersky = state.outersky_def
+  endif
+  state.photautoaper = textform.tag2
+endif
+state.photzpt = textform.tag3
+state.photclr = textform.tag4
+state.exptime = textform.tag5
+state.photerrors = textform.tag7
+state.ccdgain = (1.e-5) > textform.tag8
+state.ccdrn = 0 > textform.tag9
 
 if (state.exptime LE 0) then state.exptime = 1.0
 
