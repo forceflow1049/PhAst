@@ -1027,6 +1027,7 @@ if state.tb_spice_visible eq 1 then begin
    state.spice_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
    spice_sub_box = widget_base(state.spice_box_id,/row)
    check_moons = widget_button(spice_sub_box,value='Check Moons', uvalue='check_moons')
+   erase_labels = widget_button(spice_sub_box,value='Clear labels',uvalue='erase_labels')
 
 endif
 
@@ -1846,7 +1847,7 @@ if not keyword_set(dir) then begin
    file = dialog_pickfile(filter='*.IMG,*.img')
    if file ne '' then begin                             ;check for cancel
       image = read_vicar(file,label)                    ;read the image
-      phast_add_image,image,file, '', newimage=newimage ;omit label for now
+      phast_add_image,image,file, label, newimage=newimage ;omit label for now
       main_image = image_archive[state.current_image_index]->get_image()
       phast_getstats
    endif
@@ -1855,10 +1856,10 @@ endif else begin
    vicarfile = findfile(fileloc+'*.IMG')
    if vicarfile[0] ne '' then begin ;check the directory actually contains images
       image = read_vicar(vicarfile[0],label) ;read the image
-      phast_add_image,image,vicarfile[0],'',newimage=newimage, /dir_add, dir_num = n_elements(vicarfile)     
+      phast_add_image,image,vicarfile[0],label,newimage=newimage, /dir_add, dir_num = n_elements(vicarfile)     
       for i=1, n_elements(vicarfile)-1 do begin
          image = read_vicar(vicarfile[i],label) ;read the image
-         phast_add_image,image,vicarfile[i],'',newimage=newimage, /dir_add
+         phast_add_image,image,vicarfile[i],label,newimage=newimage, /dir_add
       endfor
    endif else begin
       newimage = 0
@@ -2477,6 +2478,7 @@ case uvalue of
         endelse   
      end
     'check_moons': phast_check_moons
+    'erase_labels': phasterase
 
 ;align
     'align_toggle': begin
@@ -2783,6 +2785,25 @@ end
 
 end
 ;----------------------------------------------------------------------
+function phast_label_get_par,lab,par
+
+;routine to return specificed parameter from VICAR label.  Similar to
+;SXGETPAR
+
+readcol, lab, label,delimiter='|',FORMAT='A',/silent
+ 
+result = ''
+success = 0
+for i=0, n_elements(label)-1 do begin
+   split = strsplit(label[i],'=',/extract) ;separate parameter from value
+   if strmatch(strtrim(split[0],2),par) ne 0 then begin
+      result = strtrim(split(n_elements(split)-1),2)
+      success = 1
+   endif
+endfor 
+return,result
+end
+;----------------------------------------------------------------------
 pro phast_check_moons
 
 ;routine to check the current VICAR image for moons with the SPICE
@@ -2794,11 +2815,67 @@ common phast_images
 ;check that the ICY DLM is installed
 
 ;load the SPICE kernels specified in state.kernel_list
-readcol,state.kernel_list,kernels, delimiter='|',format='A'
+readcol,state.kernel_list,kernels, delimiter='|',format='A',/silent
 cspice_furnsh,kernels
 
+;retrive start and stop times for image
+split_filename = strsplit(image_archive[state.current_image_index]->get_name(),'.',/extract)
+filename = split_filename[0]+'.LBL'
+start = strsplit(phast_label_get_par(filename,'START_TIME'),'"',/extract)
+start = strsplit(start[0],'Z',/extract)
+start = start[0]
+stop = strsplit(phast_label_get_par(filename,'STOP_TIME'),'"',/extract)
+stop = strsplit(stop[0],'Z',/extract)
+stop = stop[0]
+utc = [start,stop]
+cspice_str2et, utc, et
+full_time = [et[0]-3600,et[0]+3600] 
+maxwin = 1000
+TIMFMT  = 'YYYY-MON-DD HR:MN:SC.###### (TDB) ::TDB ::RND'
+TIMLEN  =  41
+                        
+moons = ["PANDORA","MIMAS","JANUS","ENCELADUS","RHEA","TETHYS","DIONE","TITAN","PAN",$
+                                "IAPETUS","PHOEBE","EPIMETHEUS","CALYPSO","HELENE","TELESTO","ATLAS","PROMETHEUS"]
+moon_naif =  [617,601,610,602,605,603,604,606,618,608,609,611,614,612,613,615,616]
+i=0
 
+while(i lt n_elements(moons)) do begin
+   cnfine = cspice_celld( 2 )
+   full_range = cspice_celld( 2 )
+   cspice_wninsd, et[0], et[1], cnfine
+   cspice_wninsd,full_time[0],full_time[1],full_range
+   inst   = 'CASSINI_ISS_NAC'
+   target = moons[i]
+   tshape = 'ELLIPSOID'
+   tframe = 'IAU_'+moons[i]
+   abcorr = 'LT+S'
+   obsrvr = 'CASSINI'
+   step   = 10.D
+   result = cspice_celld( MAXWIN*2)
+   full_result = cspice_celld( MAXWIN*2)
+                                ;check for moon in fov
+   cspice_gftfov, inst,  target, tshape, tframe, abcorr, obsrvr, $
+                  step, cnfine, result
+   cspice_gftfov, inst,  target, tshape, tframe, abcorr, obsrvr, $
+                  step, full_range, full_result
+   count = cspice_wncard( result )
+   num = cspice_wncard( full_result ) ;check whether moon found in fov
+   if(num ne 0 and count ne 0) then begin
+      cspice_wnfetd, full_result, 0, left, right ;determine time moon enters/leaves frame
+
+      offset = (left-et[0])/(left-right) ;position in frame as percent [0,1]
+      cspice_spkez,moon_naif[i],et[0],'J2000','NONE',-82,vec,ltime                    ;get moon state
+      range = (vec[0]^2+vec[1]^2+vec[2]^2)^(.5)                                   ;calculate range
+      
+      if (vec[4] gt 0) then offset = 1-offset
+      x = offset*1024
+      phastxyouts,x,600+40*i,moons[i],color='green',charsize=1.5
+      phastxyouts,x,580+40*i,"Range: "+strtrim(range,2)+" km", color='red', charsize=1.5
+   end
+   
+   i++
 end
+end 
 ;----------------------------------------------------------------------
 pro phast_cycle_images, direction,animate=animate
 
