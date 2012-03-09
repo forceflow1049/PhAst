@@ -250,6 +250,7 @@ state = {                   $
         block: 0, $             ; are we in blocking mode?
         wcstype: 'none', $      ; coord info type (none/angle/lambda)
         equinox: 'J2000', $     ; equinox of coord system
+        wcsKPNO21m: 1,         $ ; activates patch for incorrectly coded coord sys on KPNO 2.1m
         display_coord_sys: 'RA--', $ ; coord system displayed
         display_equinox: 'J2000', $ ; equinox of displayed coords
         display_base60: 1B, $   ; Display RA,dec in base 60?
@@ -291,12 +292,12 @@ state = {                   $
         max_value: 0.0, $       ; max data value mapped to colors
         skymode: 0.0, $         ; sky mode value
         skysig: 0.0, $          ; sky sigma value
-        draw_window_size: [800L, 800L], $ ; size of main draw window WAS 512/512, then 690,/690
+        draw_window_size: [800L, 760L], $ ; size of main draw window WAS 512/512, then 690/690
         track_window_size: 121L, $ ; size of tracking window
         pan_window_size: 121L, $ ; size of pan window
         pan_scale: 0.0, $       ; magnification of pan image
         image_size: [0L,0L], $  ; size of main_image
-        invert_colormap: 0L, $  ; 0=normal, 1=inverted
+        invert_colormap: 1L, $  ; 0=normal, 1=inverted
         coord: [0L, 0L],  $     ; cursor position in image coords
         scaling: 3, $           ; 0=lin,1=log,2=histeq,3=asinh
         asinh_beta: 0.1, $      ; asinh nonlinearity parameter
@@ -365,9 +366,19 @@ state = {                   $
         innersky_id: 0L, $      ; id of inner sky widget
         outersky_id: 0L, $      ; id of outer sky widget
         magunits: 0, $          ; 0=counts, 1=magnitudes
-        skytype: 0, $           ; 0=idlphot,1=median,2=no sky subtract
+        magtype: 1,           $ ; 0=instrumental; 1=catalog; 2=std BVRI
+        skytype: 0,           $ ; 0=idlphot,1=median,2=no sky subtract
         exptime: 1.0, $         ; exposure time for photometry
-        photautoaper: 0, $      ; 0=fixed aperatures; 1=auto aperture
+        phot_aperFWHM_id: 0L, $ ; id of aperture FWHM box
+        phot_aperFWHM: 2.0,   $ ; FWHM (pixels) used to size apertures
+        phot_aperFCvg: 0.94,  $ ; flux coverage (fraction) of measuring aperture
+        phot_aperFRef: 0.94,  $ ; flux coverage (fraction) of SExtractor ellipses
+        phot_aperGrow: 1.00,  $ ; growth fractor from FCvg to SEx coverage
+        phot_aperUnit_id: 0L, $ ; widget to display units of aperFWHM
+        phot_aperList: ['px', '" '], $ 
+        phot_aperTrain_ID: 0L,$ ; id of aperture Train/Lock button
+        phot_aperType_ID: 0L, $ ; widget for type of autocentering
+        phot_aperType: 0,     $ ; 0=snap-to; 1=flux centroid; 2=manual centering
         photcatalog_name: 'GSC-2.3',$ ;name of currently selected photometeric star cat
         photcatalog_loaded:0,$      ;has the photometric star catalog been loaded? 1=yes
         photzpt: 0.0,  $        ; magnitude zeropoint
@@ -394,16 +405,17 @@ state = {                   $
         skyresult_id: 0L, $     ; id of sky widget
         photresult_id: 0L, $    ; id of photometry result widget
         photerror_id: 0L, $,    ; id of photometry error widget
-        fwhm_id: 0L, $          ; id of fwhm widget
-        radplot_widget_id: 0L, $ ; id of radial profile widget
-        radplot_window_id: 0L, $ ; id of radial profile window
-        photzoom_window_id: 0L, $ ; id of photometry zoom window
+        radplot_widget_id: 0L,$ ; id of radial profile widget
+        radplot_window_id: 0L,$ ; id of radial profile window
+        photzoom_window_id: 0L,$ ; id of photometry zoom window
         photzoom_size: 190L, $  ; size in pixels of photzoom window
         showradplot_id: 0L, $   ; id of button to show/hide radplot
         photwarning_id: 0L, $   ; id of photometry warning widget
         photwarning: ' ', $     ; photometry warning text
-        photerrors: 0, $        ; calculate photometric errors?
-        pixelscale: 0.0, $      ; pixel scale, arcsecs/pixel
+        photerrors: 0, $        ; calculate photometric errors
+        objfwhm_id: 0L,       $ ; id of photometry fwhm widget
+        objfwhm: 2.0,         $ ; object fwhm (latest measured) (pixel units)
+        pixelscale: 0.0,      $ ; pixel scale, arcsecs/pixel        
         ccdgain: 3.0, $         ; CCD gain
         ccdrn: 0.0, $           ; read noise
         centerboxsize: 9L, $    ; centering box size
@@ -579,6 +591,7 @@ if file_test('phast.conf') eq 1 then begin
             'aprad': state.aprad = float(val[i])
             'innersky': state.innersky = float(val[i])
             'outersky': state.outersky = float(val[i])
+            'seeing': state.objfwhm = float(val[i])
             'pixelscale': state.pixelscale = float(val[i])
             'ccdgain': state.ccdgain = float(val[i])
             'ccdrn': state.ccdrn = float(val[i])
@@ -609,9 +622,17 @@ if file_test('phast.conf') eq 1 then begin
             'check_updates':state.check_updates = fix(val[i])
 
 
-            else: print, 'Parameter '+var[i]+' not found!'
+            else: print, 'Parameter '+var[i]+' not found in phast_state!'
         endcase
     endfor
+    ;now, process any state defaults based on inputs
+    ;
+    ; set photometric apertures based on typical object fwhm to be consistent with sextractor apertures
+    if finite(state.objfwhm) then begin
+        state.objfwhm = state.objfwhm / state.pixelScale
+        phast_setAps, state.objfwhm, 0
+    endif
+  
 endif
 
 end
@@ -833,7 +854,7 @@ top_menu = cw_pdmenu(top_menu, top_menu_desc, $
 left_pane = widget_base(base,/column,/base_align_center,xsize=270)
 track_base = widget_base(left_pane, /row)
 state.colorbar_base_id = widget_base(left_pane, $
-                                      uvalue = 'cqolorbar_base', $
+                                      uvalue = 'colorbar_base', $
                                       /column, /base_align_center, $
                                       frame = 2,xsize=250)
 
@@ -1031,7 +1052,6 @@ if state.tb_spice_visible eq 1 then begin
    state.spice_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
    spice_sub_box = widget_base(state.spice_box_id,/row)
    check_moons = widget_button(spice_sub_box,value='Check Moons', uvalue='check_moons')
-   erase_labels = widget_button(spice_sub_box,value='Clear labels',uvalue='erase_labels')
 
 endif
 
@@ -1851,7 +1871,7 @@ if not keyword_set(dir) then begin
    file = dialog_pickfile(filter='*.IMG,*.img')
    if file ne '' then begin                             ;check for cancel
       image = read_vicar(file,label)                    ;read the image
-      phast_add_image,image,file, label, newimage=newimage ;omit label for now
+      phast_add_image,image,file, '', newimage=newimage ;omit label for now
       main_image = image_archive[state.current_image_index]->get_image()
       phast_getstats
    endif
@@ -1860,10 +1880,10 @@ endif else begin
    vicarfile = findfile(fileloc+'*.IMG')
    if vicarfile[0] ne '' then begin ;check the directory actually contains images
       image = read_vicar(vicarfile[0],label) ;read the image
-      phast_add_image,image,vicarfile[0],label,newimage=newimage, /dir_add, dir_num = n_elements(vicarfile)     
+      phast_add_image,image,vicarfile[0],'',newimage=newimage, /dir_add, dir_num = n_elements(vicarfile)     
       for i=1, n_elements(vicarfile)-1 do begin
          image = read_vicar(vicarfile[i],label) ;read the image
-         phast_add_image,image,vicarfile[i],label,newimage=newimage, /dir_add
+         phast_add_image,image,vicarfile[i],'',newimage=newimage, /dir_add
       endfor
    endif else begin
       newimage = 0
@@ -2482,7 +2502,6 @@ case uvalue of
         endelse   
      end
     'check_moons': phast_check_moons
-    'erase_labels': phasterase
 
 ;align
     'align_toggle': begin
@@ -2789,25 +2808,6 @@ end
 
 end
 ;----------------------------------------------------------------------
-function phast_label_get_par,lab,par
-
-;routine to return specificed parameter from VICAR label.  Similar to
-;SXGETPAR
-
-readcol, lab, label,delimiter='|',FORMAT='A',/silent
- 
-result = ''
-success = 0
-for i=0, n_elements(label)-1 do begin
-   split = strsplit(label[i],'=',/extract) ;separate parameter from value
-   if strmatch(strtrim(split[0],2),par) ne 0 then begin
-      result = strtrim(split(n_elements(split)-1),2)
-      success = 1
-   endif
-endfor 
-return,result
-end
-;----------------------------------------------------------------------
 pro phast_check_moons
 
 ;routine to check the current VICAR image for moons with the SPICE
@@ -2819,67 +2819,11 @@ common phast_images
 ;check that the ICY DLM is installed
 
 ;load the SPICE kernels specified in state.kernel_list
-readcol,state.kernel_list,kernels, delimiter='|',format='A',/silent
+readcol,state.kernel_list,kernels, delimiter='|',format='A'
 cspice_furnsh,kernels
 
-;retrive start and stop times for image
-split_filename = strsplit(image_archive[state.current_image_index]->get_name(),'.',/extract)
-filename = split_filename[0]+'.LBL'
-start = strsplit(phast_label_get_par(filename,'START_TIME'),'"',/extract)
-start = strsplit(start[0],'Z',/extract)
-start = start[0]
-stop = strsplit(phast_label_get_par(filename,'STOP_TIME'),'"',/extract)
-stop = strsplit(stop[0],'Z',/extract)
-stop = stop[0]
-utc = [start,stop]
-cspice_str2et, utc, et
-full_time = [et[0]-3600,et[0]+3600] 
-maxwin = 1000
-TIMFMT  = 'YYYY-MON-DD HR:MN:SC.###### (TDB) ::TDB ::RND'
-TIMLEN  =  41
-                        
-moons = ["PANDORA","MIMAS","JANUS","ENCELADUS","RHEA","TETHYS","DIONE","TITAN","PAN",$
-                                "IAPETUS","PHOEBE","EPIMETHEUS","CALYPSO","HELENE","TELESTO","ATLAS","PROMETHEUS"]
-moon_naif =  [617,601,610,602,605,603,604,606,618,608,609,611,614,612,613,615,616]
-i=0
 
-while(i lt n_elements(moons)) do begin
-   cnfine = cspice_celld( 2 )
-   full_range = cspice_celld( 2 )
-   cspice_wninsd, et[0], et[1], cnfine
-   cspice_wninsd,full_time[0],full_time[1],full_range
-   inst   = 'CASSINI_ISS_NAC'
-   target = moons[i]
-   tshape = 'ELLIPSOID'
-   tframe = 'IAU_'+moons[i]
-   abcorr = 'LT+S'
-   obsrvr = 'CASSINI'
-   step   = 10.D
-   result = cspice_celld( MAXWIN*2)
-   full_result = cspice_celld( MAXWIN*2)
-                                ;check for moon in fov
-   cspice_gftfov, inst,  target, tshape, tframe, abcorr, obsrvr, $
-                  step, cnfine, result
-   cspice_gftfov, inst,  target, tshape, tframe, abcorr, obsrvr, $
-                  step, full_range, full_result
-   count = cspice_wncard( result )
-   num = cspice_wncard( full_result ) ;check whether moon found in fov
-   if(num ne 0 and count ne 0) then begin
-      cspice_wnfetd, full_result, 0, left, right ;determine time moon enters/leaves frame
-
-      offset = (left-et[0])/(left-right) ;position in frame as percent [0,1]
-      cspice_spkez,moon_naif[i],et[0],'J2000','NONE',-82,vec,ltime                    ;get moon state
-      range = (vec[0]^2+vec[1]^2+vec[2]^2)^(.5)                                   ;calculate range
-      
-      if (vec[4] gt 0) then offset = 1-offset
-      x = offset*1024
-      phastxyouts,x,600+40*i,moons[i],color='green',charsize=1.5
-      phastxyouts,x,580+40*i,"Range: "+strtrim(range,2)+" km", color='red', charsize=1.5
-   end
-   
-   i++
 end
-end 
 ;----------------------------------------------------------------------
 pro phast_cycle_images, direction,animate=animate
 
@@ -3698,7 +3642,7 @@ IF (disp_type[0] EQ 'RA--' or disp_type[0] EQ 'DEC-') THEN BEGIN
 ; generate (RA,dec) string 
    disp_ra  = ra
    disp_dec = dec
-   IF num_disp_equinox NE 2000.0 THEN precess, disp_ra, disp_dec, $
+   IF (num_disp_equinox NE 2000.0) THEN precess, disp_ra, disp_dec, $
      2000.0, num_disp_equinox
 
    IF disp_base60 THEN BEGIN ; (hh:mm:ss) format
@@ -3797,10 +3741,10 @@ zcenter = (0 > state.coord < state.image_size) - offset
 
 track = bytarr(11,11)
 boxsize=5
-xmin = 0 > (zcenter[0] - boxsize)
-xmax = (zcenter[0] + boxsize) < (state.image_size[0] - 1) 
-ymin = 0 > (zcenter[1] - boxsize) 
-ymax = (zcenter[1] + boxsize) < (state.image_size[1] - 1)
+xmin = (0 > (zcenter[0] - boxsize)) < (state.image_size[0] - 1)    ; patch, morgan to review
+xmax =  0 > (zcenter[0] + boxsize)  < (state.image_size[0] - 1) 
+ymin = (0 > (zcenter[1] - boxsize)) < (state.image_size[1] - 1)
+ymax =  0 > (zcenter[1] + boxsize)  < (state.image_size[1] - 1)
 
 startx = abs( (zcenter[0] - boxsize) < 0 )
 starty = abs( (zcenter[1] - boxsize) < 0 ) 
@@ -9883,8 +9827,8 @@ nrad = n_elements(rad)
 ; check the peak
 w = where(prof eq max(prof))
 if float(rad(w[0])) ne min(rad) then begin
-state.photwarning = 'Warning: Profile peak is off-center!'
-  return,-1
+   state.photwarning = 'Warning: Profile peak is off-center!'
+   return,-1
 endif
 
 ; interpolate radial profile at 50 times as many points
@@ -9916,7 +9860,6 @@ return,fwhm
 end
 
 ;-----------------------------------------------------------------------
-
 pro phast_radplotf, x, y, fwhm
 
 ; Program to calculate radial profile of an image
@@ -10094,6 +10037,161 @@ if (finite(mean(out)) EQ 1) then $
 
 end
 
+
+pro phast_imcenterg, image, xcenter, ycenter, apr, skyrad, badpix, xcentroid, ycentroid
+;
+; NAME: phast_imgcenterg
+;
+; PURPOSE: Image Centroiding, based on simplified version of APER (adapted from DAOPHOT) 
+;
+; EXPLANATION:  phast_imgcenterg will compute the (x,y) centroid of the flux within the measuring
+;     aperture apr after subtracting the median sky brightness from total counts.  The centroids
+;     are the first-moments of the flux distribution considering (whole) pixels with flux
+;     at least 1 sigma above the sky background. 
+;
+; CALLING SEQUENCE:
+;     phast_imgcenterg, image, xcenter, ycenter, apr, skyrad, badpix, xcentroid, ycentroid
+;
+; INPUTS:
+;     IMAGE   - input image array
+;     XCENTER - center x coordinate
+;     YCENTER - center y coordinate
+;     APR     - centroiding aperture radius
+;     SKYRAD  - Two element vector giving the inner and outer radii for the sky annulus.
+;     BADPIX  - Two element vector giving the minimum and maximum value of a good pixel.
+;
+; OUTPUTS:
+;     XCENTROID - flux-weighted x centroid
+;     YCENTROID - flux-weighted y centroid
+;     FWHM      - FWHM assuming Gaussian PSF
+;     errFWHM   - standard error in FWHM
+;
+; EXAMPLE: phast_imcenterg, main_image, x, y, state.innersky, [state.innersky, state.outersky], [0, 65535], xcentroid, ycentroid
+;       
+; PROCEDURES USED: (none)
+;
+; NOTES:
+;
+; internal parameters
+  minsky = 20      ; smallest number of pixels from which the sky may be determined
+  maxsky = 10000   ; maximum number of pixels allowed in the sky annulus.
+;
+; Get input image characteristics                                
+  s = size(image)
+  ncol = s[1]
+  nrow = s[2]
+
+  chk_badpix = badpix[0] LT badpix[1]  ; check for bad pixels or ignore?
+
+; Compute the limits of the submatrix.
+
+  lx = fix(xcenter-skyrad[1]) > 0           ; Lower limit X direction
+  ux = fix(xcenter+skyrad[1]) < (ncol-1)    ; Upper limit X direction
+  nx = ux-lx+1                              ; Number of pixels X direction
+  ly = fix(ycenter-skyrad[1]) > 0           ; Lower limit Y direction
+  uy = fix(ycenter+skyrad[1]) < (nrow-1);   ; Upper limit Y direction
+  ny = uy-ly+1                              ; Number of pixels Y direction
+  dx = xcenter-lx                           ; X coordinate of star's centroid in subarray
+  dy = ycenter-ly                           ; Y coordinate of star's centroid in subarray
+
+; Determine if star is too close to the edge for measuring aperture to fit on image
+  edge    = (dx-0.5) < (nx+0.5-dx) < (dy-0.5) < (ny+0.5-dy) ; closest edge to star
+  if ( edge LT apr ) then goto, BADSTAR
+
+; Begin determination of centroid and fwhm
+  xcentroid = xcenter
+  ycentroid = ycenter
+
+  rotbuf = image[ lx:ux, ly:uy ]        ; Extract subarray from image
+
+     rsq = fltarr( nx, ny, /NOZERO )    ; Square of the distance of each pixel from the center
+    dxsq = ( findgen( nx ) - dx )^2
+  for ii = 0, ny-1 do rsq[0,ii] = dxsq + (ii-dy)^2
+       r = sqrt(rsq) - 0.5              ; Radius of each pixel in the subarray
+
+; Select pixels within sky annulus, and eliminate bad pixels
+  rinsq  = (skyrad[0] > 0.0         )^2 
+  routsq = (skyrad[1] > skyrad[0]+1 )^2
+  skypix = ( rsq GE rinsq ) and ( rsq LE routsq )
+
+  if chk_badpix then skypix = skypix and (rotbuf GT badpix[0] ) $
+                                     and (rotbuf LT badpix[1] )
+ 
+  sindex =  where(skypix, Nsky) 
+  Nsky   =  Nsky < maxsky               ; limit to MAXSKY pixels
+  if ( nsky LT minsky ) then goto, BADSTAR
+ 
+  skybuf = rotbuf[ sindex[0:nsky-1] ]     ; SKYBUF is the 1-d array of sky pixels
+  skymed = median(skybuf)                 ; median sky brightness
+  skyvar = variance(skybuf)               ; variance of sky brightness
+  skystd = sqrt(skyvar)
+  if (skystd LT 0.0) then goto, BADSTAR 
+
+ 
+; Centroid the aperture
+  thisap  = where( r LT apr )           ; select pixels within radius
+  thisapd = rotbuf[thisap]
+  thisapr =      r[thisap]
+      
+  xindex = replicate(1,1,ny) ## (lx+indgen(ux-lx+1)) ; 
+  xvalue = xindex[thisap]
+  yindex = transpose( (ly+indgen(uy-ly+1)) ) ## replicate(1,nx,1)
+  yvalue = yindex[thisap]
+     
+  netflux = (thisapd-skymed)   ;*fractn
+  tstat = 1.645 ; 5% chance this high by chance (sky)
+  ptrflux = where( (netflux-tstat*skystd)>0 ,npix) 
+  if npix EQ 0 then goto, BADSTAR
+   
+  totalflux = total(netflux[ptrflux])
+  xcentroid = total(netflux[ptrflux]*xvalue[ptrflux]) / totalflux
+  ycentroid = total(netflux[ptrflux]*yvalue[ptrflux]) / totalflux
+
+  ;ptrflux = where(netflux>0,npix)
+  ;B = regress( thisapr[ptrflux]^2, alog(netflux[ptrflux]), SIGMA=errB, CONST=lnA, MCORRELATION=R )
+  ;if B<0.0 then begin
+  ;  sigmaGauss = sqrt(-0.5/B)
+  ;  FWHM = sigmaGauss*(2*sqrt(2*alog(2)))
+  ;  errFWHM = FWHM * abs(errB/B)
+  ;endif else begin
+  ;  FWHM = !Values.F_NaN
+  ;  errFWHM = FWHM
+  ;endelse
+
+  return
+
+BADSTAR: 
+  return
+ 
+end
+
+pro phast_setAps, fwhm, magunits
+; set apertures consistent with fwhm and sextractor ellipses
+  common phast_state
+  ; state.objfwhm always kept in pixel units
+  if magunits EQ 0 then state.objfwhm = fwhm                    $
+                   else state.objfwhm = fwhm / state.pixelscale
+  state.phot_aperFWHM = round(100*state.objfwhm)/100.0
+ 
+  ; now set measuring aperature to cover same flux as sextractor
+  gaussSigma = state.objfwhm/(2*sqrt(2*alog(2)))
+  case state.sex_PHOT_AUTOPARAMS[0] of
+    2.0 : state.phot_aperFRef = 0.90
+    2.5 : state.phot_aperFRef = 0.94
+    else: state.phot_aperFRef = 0.95
+  endcase
+  ;state.phot_aperFCvg = state.phot_aperFRef ; activate to deactivate growth curve
+  state.phot_aperGrow = state.phot_aperFRef / state.phot_aperFCvg
+  state.aprad = gaussSigma*sqrt(-2*alog(1.0-state.phot_aperFCvg))
+ 
+  ; set apertures to nearest 0.01 pixels
+  state.aprad    = round( 100 * state.aprad                           ) / 100.0 ; 90-94% flux inside
+  state.innersky = round( 100 * gaussSigma*sqrt(-2*alog(1-0.999))     ) / 100.0 ; <= 0.01% flux outside
+  state.outersky = round( 100 * sqrt( (!pi*state.innersky^2+100)/!pi) ) / 100.0 ; 100 pixels to set sky
+  state.centerboxsize = 9 > (1+2*floor(ceil(state.outersky)/2)) ; next odd integer > state.outersky
+  return
+end
+ 
 ;-----------------------------------------------------------------------
 pro phast_apphot_refresh
 
@@ -10105,25 +10203,23 @@ common phast_mpc_data
 
 state.photwarning = 'Warnings: None'
 
-; Center on the object position nearest to the cursor
-if (state.centerboxsize GT 0) then begin
-    phast_imcenterf, x, y
-endif else begin ; no centering
+; Center apertures on the object
+if (state.phot_aperType EQ 0 And state.centerboxsize NE 0) then phast_imcenterf, x, y ; snap to peak
+if (state.phot_aperType EQ 1 And state.centerboxsize NE 0) then begin ; centroid the flux
     x = state.cursorpos[0]
     y = state.cursorpos[1]
-endelse
-
-;update the exposure length and zero-point from image header
-;if state.num_images gt 0 and state.image_type eq 'FITS' then begin
-;    head = headfits(state.imagename)
-;    state.exptime = sxpar(head,'EXPTIME')
-;    state.photzpt = sxpar(head,'MAGZERO')
-;    state.photclr = sxpar(head,'MAGZCLR')
-;    state.photband= sxpar(head,'MAGZBND')
-;    state.photzerr= sxpar(head,'MAGZERR')
-;    state.photznum= sxpar(head,'MAGZNUM')
-;endif
-
+    for ipass = 1, 2 do begin
+      phast_imcenterg, main_image, x, y, state.innersky, [state.innersky, state.outersky], [0, 65535], xcentroid, ycentroid
+      x = xcentroid
+      y = ycentroid 
+    endfor     
+endif
+if (state.phot_aperType EQ 2 Or state.centerboxsize EQ 0) then begin ; use cursor position
+    x = state.cursorpos[0]
+    y = state.cursorpos[1]
+endif
+state.centerpos = [x, y]
+   
 ; Make sure that object position is on the image
 x = 0 > x < (state.image_size[0] - 1)
 y = 0 > y < (state.image_size[1] - 1)
@@ -10151,9 +10247,8 @@ maxy = (y + state.outersky) < (state.image_size[1] - 1)
 
 subimg = main_image[minx:maxx, miny:maxy]
 if (finite(mean(subimg)) EQ 0) then begin
-    phast_message, $
-      'Sorry- PHAST can not do photometry on regions containing NaN values.', $
-      /window, msgtype = 'error'
+    phast_message, 'Sorry- PHAST can not do photometry on regions containing NaN values.', $
+                  /window, msgtype = 'error'
     return
 endif
 
@@ -10161,7 +10256,6 @@ endif
 badpix = [state.image_min-1, state.image_max+1]  
 
 if (state.skytype EQ 1) then begin    ; calculate median sky value
-
     xmin =              (x - state.outersky) > 0
     xmax = (xmin + (2 * state.outersky + 1)) < (state.image_size[0] - 1)
     ymin =              (y - state.outersky) > 0
@@ -10192,165 +10286,202 @@ if (state.skytype EQ 1) then begin    ; calculate median sky value
     endelse
 endif
 
-  ipass = 0
-maxpass = 2
-repeat begin
-  ipass = ipass + 1
+; Do the photometry now
+phpadu =  state.ccdgain
+apr    = [state.aprad]
+skyrad = [state.innersky, state.outersky]
+ 
+case state.skytype of  ; have aper work in flux units; handle mag conversions ourselves
+  0: aper, main_image, [x], [y], flux, fluxerr, sky, skyerr, phpadu, apr, skyrad, badpix, flux=1, $
+           /silent, readnoise = state.ccdrn                     ; IDLPhot Sky (modal value)
+  1: aper, main_image, [x], [y], flux, fluxerr, sky, skyerr, phpadu, apr, skyrad, badpix, flux=1, $
+           /silent, readnoise = state.ccdrn, setskyval = skyval ; Median value
+  2: aper, main_image, [x], [y], flux, fluxerr, sky, skyerr, phpadu, apr, skyrad, badpix, flux=1, $
+           /silent, readnoise = state.ccdrn, setskyval = 0      ; No Sky Subtraction
+endcase
+flux = flux[0] & fluxerr = fluxerr[0]
+sky  =  sky[0] &  skyerr =  skyerr[0]
 
-  phpadu = state.ccdgain
-  apr    = [state.aprad]
-  skyrad = [state.innersky, state.outersky]
+; Apply growth function adjustment to match Sextractor (reference) flux coverage
+fluxerr = fluxerr / flux
+flux    = flux * state.phot_aperGrow
+fluxerr = flux * fluxerr
 
-  ; Do the photometry now
-  case state.skytype of
-    0: aper, main_image, [x], [y], flux, errap, sky, skyerr, phpadu, apr, $
-             skyrad, badpix, flux=abs(state.magunits-1), /silent, $
-             readnoise = state.ccdrn
-    1: aper, main_image, [x], [y], flux, errap, sky, skyerr, phpadu, apr, $
-             skyrad, badpix, flux=abs(state.magunits-1), /silent, $
-             setskyval = skyval, readnoise = state.ccdrn
-    2: aper, main_image, [x], [y], flux, errap, sky, skyerr, phpadu, apr, $
-             skyrad, badpix, flux=abs(state.magunits-1), /silent, $
-             setskyval = 0, readnoise = state.ccdrn
-  endcase
+ skyerr =  skyerr /  sky
+ sky    =  sky * state.phot_aperGrow
+ skyerr =  sky *  skyerr
 
-  flux = flux[0]
-  sky  =  sky[0]
+if (flux EQ !VALUES.F_NAN) then state.photwarning = 'Warning: Error in computing flux!'
 
-  if (flux EQ 99.999) then begin
-    state.photwarning = 'Warning: Error in computing flux!'
-    flux = !values.F_NAN
-    endif
+; Run phast_radplotf and plot the results
+phast_setwindow, state.radplot_window_id
+phast_radplotf, x, y, FWHM
 
-  if (state.magunits EQ 1) then flux = (flux - 25.0) + state.photzpt + state.photclr*state.photSpecBmR  + 2.5 * alog10(state.exptime)
-
-  ; Run phast_radplotf and plot the results
-  phast_setwindow, state.radplot_window_id
-  phast_radplotf, x, y, fwhm
-
-  ; overplot the phot apertures on radial plot
-  plots, [state.aprad, state.aprad], !y.crange, line = 1, color=2, thick=2, psym=0
-
-  ymin = !y.crange(0)
-  ymax = !y.crange(1)
-  ypos = ymin + 0.85*(ymax-ymin)
-  xyouts, /data, state.aprad, ypos, ' aprad', color=2, charsize=1.5
-  if (state.skytype NE 2) then begin
+plots, [state.aprad, state.aprad], !y.crange, line = 1, color=2, thick=2, psym=0 ; overplot the apertures
+ymin = !y.crange(0)
+ymax = !y.crange(1)
+ypos = ymin + 0.85*(ymax-ymin)
+xyouts, /data, state.aprad, ypos, ' aprad', color=2, charsize=1.5
+if (state.skytype NE 2) then begin
     plots, [state.innersky,state.innersky], !y.crange, line = 1, color=4, thick=2, psym=0
     ypos = ymin + 0.75*(ymax-ymin)
     xyouts, /data, state.innersky, ypos, ' insky', color=4, charsize=1.5
     plots, [state.outersky,state.outersky], !y.crange, line = 1, color=5, thick=2, psym=0
     ypos = ymin + 0.65*(ymax-ymin)
     xyouts, /data, state.outersky * 0.82, ypos, ' outsky', color=5, charsize=1.5
-  endif
-  plots, !x.crange, [sky, sky], color=1, thick=2, psym=0, line = 2
-  xyouts, /data, state.innersky + (0.1*(state.outersky-state.innersky)), $
-          sky+0.07*(!y.crange[1] - sky), 'sky level', color=1, charsize=1.5
-          
-  ; reset the apertures
-  if (state.photautoaper EQ 1) then begin
-    gaussSigma = fwhm/(2*sqrt(2*alog(2)))
-    case state.sex_PHOT_AUTOPARAMS[0] of
-      2.0 : state.aprad = gaussSigma*sqrt(-2*alog(1-0.90))
-      2.5 : state.aprad = gaussSigma*sqrt(-2*alog(1-0.94))
-      else: state.aprad = gaussSigma*sqrt(-2*alog(1-0.90))
-      endcase
-      state.aprad    = round( 100 * state.aprad                           ) / 100.0
-      state.innersky = round( 100 * gaussSigma*sqrt(-2*alog(1-0.9999))    ) / 100.0
-      state.outersky = round( 100 * sqrt( (!pi*state.innersky^2+100)/!pi) ) / 100.0
-      state.centerboxsize = 9 > round( 1.2*state.outersky )
-  endif
-  
-  phast_resetwindow
-endrep until (ipass eq maxpass)
+endif
+plots, !x.crange, [sky, sky], color=1, thick=2, psym=0, line = 2
+xyouts, /data, state.innersky + (0.1*(state.outersky-state.innersky)), $
+        sky+0.07*(!y.crange[1] - sky), 'sky level', color=1, charsize=1.5
 
-; write results to file if requested  
+; Update object FWHM after every measurement
+state.objfwhm = FWHM
+
+; Update aperture sizing to be consistent with current aperFWHM and units
+phast_setAperFWHM
+
+; assemble results and do error analysis
+area = !pi*state.aprad*state.aprad
+
+imgScale = 1.0          ; Pixel and ADU units
+FWHM = FWHM             ; from radial plot (pixels)
+
+flux     = flux          ; from APER ADUs
+instrerr = sqrt( fluxerr^2 + area*(state.ccdrn^2 + (state.ccdgain^2-1)/12) ) ; add in read and quantization noise
+ fluxerr = instrerr
+     SNR = 999.9 < flux/fluxerr  
+    
+sky    = sky            ; from APER ADUs
+skyerr = skyerr         ; from APER ADUs,read noise counted empirically 
+
+; solve for limiting magnitude defined by minSNR
+varOther = fluxerr^2 - flux/state.ccdgain  ; var(Other) = sky noise + var(mean sky) + read noise + quantization noise
+minSNR   = 5
+A =  1.0/minSNR^2
+B = -1.0/state.ccdgain
+C = -varOther
+limflux  = (-B + sqrt(B^2-4*A*C)) / (2*A) ; limiting magnitude ADUs
+
+if (state.magunits EQ 1) then begin
+
+    case state.magtype of
+       0: begin ; instrumental magnitudes
+            zeropt = 0.0
+            fluxerr = 1.0857*fluxerr/flux
+          end
+       1: begin ; catalog magnitudes
+            zeropt = state.photzpt
+            fluxerr  = 1.0857 * sqrt( fluxerr^2 + (flux*state.photzerr/1.0857)^2 ) / flux  ; missing color term errors
+          end          
+       2: begin ; std BVRI magnitudes
+            zeropt = state.photzpt
+            fluxerr  = 1.0857 * sqrt( fluxerr^2 + (flux*state.photzerr/1.0857)^2 ) / flux  ; missing color term errors
+          end          
+    endcase
+    
+    imgScale = state.pixelscale   ; arcsecond and magnitude units
+    FWHM = FWHM*imgScale
+    
+    instrerr = 1.0857 * instrerr/flux 
+    flux     = zeropt + state.photclr*state.photSpecBmR - 2.5 * alog10(flux / state.exptime)
+    
+    skyerr   = 1.0857 * skyerr/sky
+    sky      = sky / (imgScale*imgScale)                      ; flux/arcsecond^2
+    sky      = zeropt -2.5 * alog10(sky/state.exptime) ; mags/arcsecond^2
+   
+    limflux  = zeropt + state.photclr*state.photSpecBmR - 2.5 * alog10(limflux / state.exptime)     
+
+endif
+
+; Write results to file if requested  
 if (state.photprint EQ 1) then begin
    openw, state.photfile, state.photfilename, /append
-   if (state.photerrors EQ 0) then errap = 0.0
+   if (state.photerrors EQ 0) then fluxerr = 0.0
    formatstring = '(2(f7.1," "),3(f5.1," "),3(g12.6," "),f5.2)'
    printf, state.photfile, x, y, state.aprad, $
-           state.innersky, state.outersky, sky, flux, errap, fwhm, $
+           state.innersky, state.outersky, sky, flux, fluxerr, FWHM, $
            format = formatstring
    close, state.photfile
 endif
 
-; output the results
-case state.magunits of
-    0: begin
-        imgScale = 1.0
-       end
-    1: begin
-        imgScale = state.pixelscale
-       end
-endcase
-
-state.centerpos = [x, y]
+; Set WCS string if WCS available
 if ptr_valid(state.astr_ptr) then begin
     xy2ad,x,y,*(state.astr_ptr),ra,dec
-    wcsstring = phast_wcsstring(ra, dec, (*state.astr_ptr).ctype,  $
-                              state.equinox, state.display_coord_sys, $
-                              state.display_equinox, state.display_base60)
-end
+    wcsstring = phast_wcsstring(ra, dec, (*state.astr_ptr).ctype,       $
+                                state.equinox, state.display_coord_sys, $
+                                state.display_equinox, state.display_base60)
+endif
 
 tmp_string0 = string(state.cursorpos[0], state.cursorpos[1], $
                      format = '("Cursor position:  x=",i4,"  y=",i4)' )
 tmp_string1 = string(state.centerpos[0], state.centerpos[1], $
                      format = '("Object position: (",f6.1,", ",f6.1,")")')
 
-
 if state.magunits eq 0 then begin ; pixel and ADU units
-    tmp_string2 = string(flux, format= '("Object counts: ",F12.1)' )  + ' ' + string(177b) + ' ' + string(errap,  format= '(f5.3)' ) 
-    tmp_string3 = string(sky,  format= '(" Sky Bkg: ",F9.1)' )        + ' ' + string(177b) + ' ' + string(skyerr, format= '(f5.3)' )
-    SNR = 999.9 < flux/errap  
-    tmp_string4 = string(imgScale*fwhm, format='("  FWHM: ",f4.2, 1h")' ) + string(SNR, format= '(2x,"SNR: ",f5.1)' )
+    tmp_string2 = string(FWHM, format='("      FWHM:  ",F5.1, 4h pix)' ) + string(SNR, format= '("   SNR  : ",f5.1)' )
+    tmp_string3 = '   Obj ADU: ' + fmtInteger(flux,9) 
+    tmp_string4 = '   Sky ADU: ' + fmtInteger(sky ,9) 
+    errstring   = ' Instr Err:        N/A'
+    if (state.photerrors EQ 1) then begin
+        tmp_string3 = tmp_string3 + ' ' + string(177b) + ' ' + strtrim(fmtInteger(fluxerr,9),2)
+        tmp_string4 = tmp_string4 + ' ' + string(177b) + ' ' + strtrim(fmtInteger( skyerr,9),2)
+        errstring = ' Instr Err: ' + string(177b) + fmtInteger(instrerr,8) + '   SNR=' + fmtInteger(minSNR,1) + ': ' + strtrim(fmtInteger(limflux,9),2)
+    endif
 endif else begin  ; arcsec and magnitude units
-    skyerr = 1.0857 * skyerr/sky
-    sky = sky / (!pi*state.aprad*state.aprad)                         ; flux per pixel = sky flux/(!pi*state.aprad*state.aprad)
-    sky = sky / (imgScale*imgScale)                                   ; magnitude/arcsecond^2
-    sky =  state.photzpt -2.5 * alog10(sky/state.exptime) ; 
-    SNR = 1.0 / (errap/1.0857)
-    tmp_string2 = string(flux, format= '("    Magnitude: ",f5.2)' ) + ' ' + string(177b) + ' ' + string(sqrt(errap^2+state.photzerr^2), format= '(f4.2)' )  
-    tmp_string3 = string(sky,  format= '("  Sky Bkg: ",f5.2)' ) + ' ' + string(177b) + ' ' + string(skyerr                        , format= '(f4.2)' )             
-    tmp_string4 = string(imgScale*fwhm, format='("    FWHM: ",f4.2, 1h")' ) + string(SNR, format= '(2x,"SNR: ",f5.1)' )
+    tmp_string2 = string(FWHM, format='("      FWHM: ",F5.1,1h")'  ) + string(SNR, format= '(7X,"SNR  : ",F5.1)' )
+    tmp_string3 = string(flux, format='("   Obj Mag: ",f6.3  )'  )  
+    tmp_string4 = string(sky,  format='("   Sky Bkg: ",f6.3  )'  )
+    errstring   = ' Instr:  N/A'
+    if (state.photerrors EQ 1) then begin
+        tmp_string3 = tmp_string3 + ' ' + string(177b) + ' ' + string(fluxerr, format= '(f5.3)' )  
+        tmp_string4 = tmp_string4 + ' ' + string(177b) + ' ' + string( skyerr, format= '(f5.3)' )
+        errstring = ' Instr Err: ' + string(177b) + string(instrerr,format='(1X,F5.3)') + '      ' + string(limflux, format='("SNR=5: ",F5.2)' )
+    endif              
 endelse
 
-if (state.photerrors EQ 0) then begin
-   errstring = 'Photometric error: N/A'
-endif else begin
-   if state.magunits eq 0 then errstring = strcompress('Precision: ' + ' ' + string(177b) + ' ' + string(errap, format = '(F12.1)' )) $
-                          else errstring = strcompress('Precision: ' + ' ' + string(177b) + ' ' + string(errap, format = '(f7.4)' ))
-endelse
 
 ;pass data to MPC report
 phast_get_mpc_data,mpc.index,flux
 
 widget_control, state.centerbox_id,   set_value = state.centerboxsize
-;widget_control, state.cursorpos_id,  set_value = tmp_string0
-widget_control, state.apphot_wcs_id,  set_value=wcsstring
+widget_control, state.apphot_wcs_id,  set_value = wcsstring
 widget_control, state.centerpos_id,   set_value = tmp_string1
 widget_control, state.radius_id,      set_value = state.aprad 
 widget_control, state.outersky_id,    set_value = state.outersky
 widget_control, state.innersky_id,    set_value = state.innersky
-widget_control, state.skyresult_id,   set_value = tmp_string3
-widget_control, state.photresult_id,  set_value = tmp_string2
-widget_control, state.fwhm_id,        set_value = tmp_string4
-widget_control, state.photwarning_id, set_value=state.photwarning
+widget_control, state.photwarning_id, set_value = state.photwarning
+widget_control, state.objfwhm_id,        set_value = tmp_string2
+widget_control, state.photresult_id,  set_value = tmp_string3
+widget_control, state.skyresult_id,   set_value = tmp_string4
 widget_control, state.photerror_id,   set_value = errstring
-
-; Uncomment next lines if you want phast to output the WCS coords of 
-; the centroid for the photometry object:
-;if (state.wcstype EQ 'angle') then begin
-;    xy2ad, state.centerpos[0], state.centerpos[1], *(state.astr_ptr), $
-;      clon, clat
-;    wcsstring = phast_wcsstring(clon, clat, (*state.astr_ptr).ctype,  $
-;                state.equinox, state.display_coord_sys, state.display_equinox)
-;    print, 'Centroid WCS coords: ', wcsstring
-;endif
 
 phast_tvphot
 
 phast_resetwindow
+end
+
+; format an integer with commas (NNN,NNN)
+function fmtInteger, number, fldwidth
+  value = string(round(number),format='(I12)')
+   len  = strlen(value)-1
+  field = strmid(value,len-2,3)
+
+  char  = strmid(value,len-3,1)
+  while char NE ' ' do begin
+    value = strmid(value,0,len-2)
+      len = strlen(value)-1
+    field = strmid(value,len-2,3) + ',' + field
+     char = strmid(value,len-3,1)
+  endwhile
+  
+  field = strtrim(field,2)
+  if strlen(field) LE fldwidth then begin
+     if strlen(field) LT fldwidth then for i = strlen(field), fldwidth do field = ' ' + field
+  endif else begin
+    field = ''
+    for i = 1, fldwidth do field = field + '*'
+  endelse
+  return, field
 end
 
 ;----------------------------------------------------------------------
@@ -10482,6 +10613,25 @@ case uvalue of
         phast_apphot_refresh
     end
 
+    'aperType': begin
+        state.phot_aperType = event.value
+        phast_apphot_refresh
+    end
+    
+    'aperFWHM': begin
+      if state.magunits EQ 0 then aperFWHM = round(100*event.value)/100.0 $
+                             else aperFWHM = round(100*event.value/state.pixelScale)/100.0 
+      state.phot_aperFWHM = aperFWHM
+      phast_setAps, state.phot_aperFWHM, 0
+      phast_apphot_refresh
+    end
+    
+    'aperTrain': begin
+      state.phot_aperFWHM = round(100*state.objfwhm)/100.0
+      phast_setAps, state.objfwhm, 0
+      phast_apphot_refresh
+    end
+
     'spectralLtr': begin
         state.photSpecType = event.value
         state.photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
@@ -10583,11 +10733,6 @@ case uvalue of
        endelse
     end 
 
-;    'magunits': begin
-;        state.magunits = event.value
-;        phast_apphot_refresh
-;    end
-
     'photsettings': phast_apphot_settings
 
     'apphot_done': widget_control, event.top, /destroy
@@ -10630,12 +10775,12 @@ skyline = ('0, button, IDLPhot Sky Mode|Median Sky|No Sky Subtraction,'+$
                       string(state.skytype))
 
 magline =  ('0, button, Pixels ADUs|Arcsecs Magnitudes, exclusive,' + $
-            'label_left =Select Output Units: , set_value =' + $
-            string(state.magunits))
+                       'label_left =Select Output Units: , set_value = ' + $
+                       string(state.magunits))
 
-aperline =  ('0, button, Fixed Apertures|Auto Apertures, exclusive,' + $
-            'label_left =Select Aperture Sizes: , set_value =' + $
-            string(state.photautoaper))
+typeline =  ('0, button, Instrumental|Catalog BVR|Standard BVR, exclusive,' + $
+                         'label_left =Select Magnitude System: , set_value =' + $
+                         string(state.magtype))
             
 zptline =  ('0, float,'+string(state.photzpt,'(F6.3)') + $
             ',label_left = Magnitude Zeropoint:,'  +  'width = 6')
@@ -10673,7 +10818,7 @@ warningline4 = $
 
 formdesc = [skyline,      $
             magline,      $
-            aperline,     $
+            typeline,     $
             zptline,      $
             clrline,      $
             exptimeline,  $
@@ -10690,22 +10835,15 @@ textform = cw_form(formdesc, /column, $
 
 if (textform.tag15 EQ 1) then return ; cancelled
 
-state.skytype = textform.tag0
+state.skytype  = textform.tag0
 state.magunits = textform.tag1
-if (state.photautoaper NE textform.tag2) then begin
-  if textform.tag2 EQ 0 then begin      ; return to defauult apertures
-    state.aprad = state.aprad_def
-    state.innersky = state.innersky_def
-    state.outersky = state.outersky_def
-  endif
-  state.photautoaper = textform.tag2
-endif
-state.photzpt = textform.tag3
-state.photclr = textform.tag4
-state.exptime = textform.tag5
+state.magtype  = textform.tag2
+state.photzpt  = textform.tag3
+state.photclr  = textform.tag4
+state.exptime  = textform.tag5
 state.photerrors = textform.tag7
-state.ccdgain = (1.e-5) > textform.tag8
-state.ccdrn = 0 > textform.tag9
+state.ccdgain  = (1E-5) > textform.tag8
+state.ccdrn    =    0   > textform.tag9
 
 if (state.exptime LE 0) then state.exptime = 1.0
 
@@ -11149,20 +11287,20 @@ endif
 ; begin zeropoint determination
 widget_control,/hourglass ;this could be slow
 
-match_tol = 1.5 / 3600.   ; astrometric matching tolerance (arcsecs converted to degrees)
+match_tol = 2.0 / 3600.   ; astrometric matching tolerance (arcsecs converted to degrees)
 sigmaClip = 2.00          ; outlier rejection: 1-in-25 chance of false positive (N=25)
 minSNRe   = 10.0          ; minimum detection SNRe to use in calibration
 
 ; 1) determine filter and exposure for image (patch=filter info should be read from config file)
 keyFilter = 'FILTERS'
-txtFilter = [ '', 'V', 'B', '?', 'R', '?', '?', 'C', 'C' ]
+txtFilter = [ '', 'V', 'B', 'U', 'R', 'I', 'U', 'C', 'Ha' ]
 
 fits_read, state.imagename, image, head  
 exposure  = sxpar(head,'EXPTIME')
 posFilter = sxpar(head,keyFilter)
 imgBand   = txtFilter[posFilter]
 
-; 2) obtain catalog for matching area on the sky  (patch=pass in sky area size)
+; 2) obtain catalog for matching area on the sky  (patch=pass in sky area size)phot_event
 xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a,d
 star_catalog = phast_get_stars(a,d,catalog_name=state.photcatalog_name)
 state.photcatalog_loaded = 1
@@ -11192,12 +11330,26 @@ for i=0, n_elements(cat_RA)-1 do begin
   endif
 endfor
 
-good = where(finite(cat_BMag),count)  &  if count gt 0 then haveB = 1 else haveB = 0
-good = where(finite(cat_VMag),count)  &  if count gt 0 then haveV = 1 else haveV = 0
-good = where(finite(cat_RMag),count)  &  if count gt 0 then haveR = 1 else haveR = 0
+; determine availability of photometric bands in catalog
+goodB = where(finite(cat_BMag),countB)  &  if countB gt 3 then haveB = 1 else haveB = 0
+goodV = where(finite(cat_VMag),countV)  &  if countV gt 3 then haveV = 1 else haveV = 0
+goodR = where(finite(cat_RMag),countR)  &  if countR gt 3 then haveR = 1 else haveR = 0
+case state.photcatalog_name of
+  'USNO-B1.0': begin
+    haveB = 1
+    haveV = 0
+    haveR = 1
+    end 
+  'GSC-2.3': begin
+    haveB = 1
+    haveV = 0
+    haveR = 1
+    end
+endcase
 
 cat_BmR  = cat_BMag - cat_RMag ; B-R color index
-good = where(finite(cat_BmR),count)   &  if count gt 0 then haveBmR = 1 else haveBmR = 0
+good = where(finite(cat_BmR),countBmR)
+if countBmR gt 3 then haveBmR = 1 else haveBmR = 0
   
 if not (haveB or haveV or haveR) then begin  ; bad catalog
   msgarr = strarr(2)
@@ -11225,10 +11377,16 @@ case imgBand of  ; determine if catalog supports the filter passband
            cat_err = cat_errV
            magzbnd = 'v'
         endif else begin
-           msgarr = strarr(2)
-           msgarr(0) = 'Photometric ' + imgBand + ' zeropoint can not be determined'
-           msgarr(1) = state.photcatalog_name + ' is missing v'                                                                               
-           return
+          if haveR then begin
+            cat_Mag = cat_RMag
+            cat_err = cat_errR
+            magzbnd = 'r'
+          endif else begin
+            msgarr = strarr(2)
+            msgarr(0) = 'Photometric ' + imgBand + ' zeropoint can not be determined'
+            msgarr(1) = state.photcatalog_name + ' is missing r'                                                                               
+            return
+          endelse
         endelse
      end
 'R': begin
@@ -11267,7 +11425,7 @@ good = where( finite(cat_Mag) and finite(cat_Err) and finite(cat_BmR) )  ; reduc
 if n_elements(good) lt n_elements(cat_BmR) then begin
    index = indgen(n_elements(cat_BmR))
    remove, good, index ; index is now bad points
-   if count gt 0 then begin
+   if countBmR gt 0 then begin
       remove, index, cat_RA, cat_dec, cat_Mag, cat_Err, cat_Bmr, cat_Bmag, cat_ErrB, cat_VMag, cat_ErrV, cat_RMag, cat_ErrR
    endif
 endif
@@ -11279,7 +11437,7 @@ textstr = '-CATALOG_TYPE ASCII_HEAD -PARAMETERS_NAME zeropoint.param ' +   $
                                                              
 phast_do_sextractor, image=state.imagename, flags=textstr, cat_name='./output/catalogs/zeropoint.cat'
 readcol, './output/catalogs/zeropoint.cat', im_ra, im_dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
-
+phot_event
 ; qualify SExtractor detections
 Instr( where(   flags gt  0  ) ) = !values.F_NAN  ; avoid complicated/corrupted detections
 Instr( where(   Instr ge 99.0) ) = !values.F_NAN  ; avoid sextractor missing value code (99.0)
@@ -11296,7 +11454,7 @@ good = where( finite(Instr) and finite(errInstr) )  ; reduce to surviving detect
 if n_elements(good) lt n_elements(Instr) then begin
    index = indgen(n_elements(Instr))
    remove, good, index ; index is now bad points
-   if count gt 0 then begin
+   if countBmR gt 0 then begin
       remove, index, im_ra, im_dec, Instr, errInstr, flags
    endif
 endif
@@ -11306,13 +11464,16 @@ endif
 errCat = make_array(1,n_elements(im_ra),/DOUBLE,VALUE=!VALUES.f_nan)
    BmR = make_array(1,n_elements(im_ra),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold the B-R color index of matching star
 errBmR = make_array(1,n_elements(im_ra),/DOUBLE,VALUE=!VALUES.f_nan)
-    
+cosDec = cos(im_dec*3.1415926535/180.0)
+
   for i=0, n_elements(Instr)-1 do begin 
       match_dist = 1.0 ;(in deg)
+      close_dist = 1.0
       match_index = -1 ; will be set to catalog index j when a match is found
       for j=0, n_elements(cat_RA)-1 do begin
-        dist = sqrt((cat_RA[j]-im_ra[i])^2 + (cat_Dec[j]-im_dec[i])^2)
+        dist = sqrt((cosDec[i]*(cat_RA[j]-im_ra[i]))^2 + (cat_Dec[j]-im_dec[i])^2)
         ; match must be within match_tol with valid instrumental Mag and catalog magnitudes
+        close_dist = close_dist < dist
         if (dist lt match_dist) and (dist lt match_tol) and finite(Instr[i]) and finite(cat_BmR[j]) then begin 
           match_dist  = dist
           match_index = j
@@ -11333,7 +11494,7 @@ errBmR = make_array(1,n_elements(im_ra),/DOUBLE,VALUE=!VALUES.f_nan)
   if n_elements(good) lt n_elements(Cat) then begin
     index = indgen(n_elements(Cat))
     remove, good, index ; index is now bad points
-    if count gt 0 then begin
+    if countBmR gt 0 then begin
       remove, index, im_ra, im_dec, flags, Y, errY, Instr, errInstr, Cat, errCat, BmR, errBmR
     endif
   endif
@@ -11847,7 +12008,7 @@ ra = 15*ten(ra)
 dec = ten(dec)
 ;get current EQUINOX
 equinox = sxpar(cal_science_head,'EQUINOX')
-;precess,ra,dec,equinox,2000 ; precess to J2000   rwc patch for 2.1m
+;if wcsKPNO21m NE 1 then precess,ra,dec,equinox,2000 ; precess to J2000
 
 ;write header values required for plate solution
 sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
@@ -12390,176 +12551,160 @@ if (not (xregistered('phast_apphot', /noshow))) then begin
                   /column,xoffset=state.draw_window_size[0]+300, $
                   title = 'phast aperture photometry', $
                   uvalue = 'apphot_base')
-    
-    ;apphot_top_base = widget_base(apphot_base, /column, /base_align_center)
 
     apphot_row_1     = widget_base(apphot_base,/row,/base_align_center)
-    apphot_insert    = widget_base(apphot_base,/row,/base_align_center)
+    apphot_insert1   = widget_base(apphot_base,/row,/base_align_center)
+    apphot_insert2   = widget_base(apphot_base,/row,/base_align_center)
     apphot_row_2     = widget_base(apphot_base,/row,/base_align_center)
     apphot_draw_base = widget_base(apphot_base,/row,/base_align_center, frame=0)
 
-    apphot_data_base1a = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_left)
+    apphot_data_base1a  = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_left)
 
-    apphot_plot_base   = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_center)
+    apphot_plot_base    = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_center)
 
-    apphot_data_insert = widget_base(apphot_insert,/row,    frame=4,xsize=492,ysize= 50, /base_align_center)
+    apphot_data_insert1 = widget_base(apphot_insert1,/row,   frame=4,xsize=492,ysize= 50, /base_align_center)
 
-    apphot_data_base1  = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130, /base_align_center)
+    apphot_data_insert2 = widget_base(apphot_insert2,/row,   frame=4,xsize=492,ysize= 50, /base_align_center)
 
-    apphot_data_base2  = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130 ,/base_align_center)
+    apphot_data_base1   = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130, /base_align_center)
 
+    apphot_data_base2   = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130 ,/base_align_center)
 
-   
+    ; populate apphot_data_base1a
+    tmp_string1 = string(99999.0, 99999.0, format = '("Object position: (",f7.1,", ",f7.1,")")')
+    state.centerpos_id  = widget_label(apphot_data_base1a, value = tmp_string1, uvalue = 'centerpos', /align_center)
+    
+    state.apphot_wcs_id = widget_label(apphot_data_base1a, value='--- No WCS Info ---', /align_center, /dynamic_resize)
+
+    state.centerbox_id = $
+      cw_field(apphot_data_base1a, $
+               /long, $
+               /return_events, $
+               title = 'Centering box size (pix):', $
+               uvalue = 'centerbox', $
+               value = state.centerboxsize, $
+               xsize = 7)
+    
+    state.radius_id = $
+      cw_field(apphot_data_base1a, $
+               /floating, $
+               /return_events, $
+               title = '   Aperture radius (pix):', $
+               uvalue = 'radius', $
+               value = state.aprad, $
+               xsize = 7)
+    
+    state.innersky_id = $
+      cw_field(apphot_data_base1a, $
+               /floating, $
+               /return_events, $
+               title = '  Inner sky radius (pix):', $
+               uvalue = 'innersky', $
+               value = state.innersky, $
+               xsize = 7)
+    
+    state.outersky_id = $
+      cw_field(apphot_data_base1a, $
+               /floating, $
+               /return_events, $
+               title = '  Outer sky radius (pix):', $
+               uvalue = 'outersky', $
+               value = state.outersky, $
+               xsize = 7)
+
+    ; populate apphot_data_insert1 
+    if state.magunits EQ 1 then state.phot_aperFWHM = round(100*state.objFWHM)/100.0                       $
+                           else state.phot_aperFWHM = round(100*state.objFWHM * state.pixelscale)/100.0
+    
+    state.phot_aperFWHM_ID  = cw_field(apphot_data_insert1, /floating, /return_events, uvalue = 'aperFWHM', $
+                                       value = state.phot_aperFWHM, title='Apertures:   FWHM', xsize = 4, /row)
+                                                                     
+    state.phot_aperUnit_ID  = cw_field(apphot_data_insert1, /string, uvalue = 'aperUnit', $
+                                       value = state.phot_aperList[state.magunits], title='', xsize = 2, /row)
+                                       
+
+    state.phot_aperTrain_ID = widget_button(apphot_data_insert1, value = 'Train', uvalue = 'aperTrain', xsize=50)                                       
+                                                       
+    state.phot_aperType_ID  = cw_bgroup(apphot_data_insert1, ['Snap To', 'Centroid', 'Manual'], uvalue = 'aperType', $
+                                                              button_uvalue = [0, 1, 2], set_value = 0, label_left = '', $
+                                                              /exclusive, /no_release, /row)
+                                                
+    ; populate apphot_data_insert2
     photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
     if count eq 0 then begin
                        state.photSpecType = 'K'
                        photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
     endif
     state.photSpecTypeNum = (0 > photSpecTypeNum[0]) < 9 
-    state.photSpec_Type_ID = cw_bgroup(apphot_data_insert, state.photSpecList, uvalue = 'spectralLtr',  $
+    state.photSpec_Type_ID = cw_bgroup(apphot_data_insert2, state.photSpecList, uvalue = 'spectralLtr',  $
                                  button_uvalue = state.photSpecList,                              $
                                  /exclusive, set_value = state.photSpecTypeNum,                   $
                                  /no_release,                                                     $
                                  /row)
 
     state.photSpecSubNum = (0 > state.photSpecSubNum) < 9
-    state.photSpec_Num_ID  = cw_field(apphot_data_insert, /long, /return_events, uvalue = 'spectralNum', $
-                                value = state.photSpecSubNum, title='', xsize = 2, /row)                              
+    state.photSpec_Num_ID  = cw_field(apphot_data_insert2, /long, /return_events, uvalue = 'spectralNum', $
+                                value = state.photSpecSubNum, title='', xsize = 1, /row)                              
 
     colors = phast_intrinsic_colors(state.photSpecTypeNum, state.photSpecSubNum)
     state.photSpecBmV = colors[0]
     state.photSpecVmR = colors[1]
     state.photSpecBmR = colors[2]
         
-    state.photSpec_BmV_ID  = cw_field(apphot_data_insert, /floating, /return_events, uvalue = 'spectralBmV', $
-                                      value = state.photSpecBmV, title='B-V', xsize = 5, /row)                              
+    state.photSpec_BmV_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralBmV', $
+                                      value = state.photSpecBmV, title='B-V', xsize = 4, /row)                              
 
-    state.photSpec_VmR_ID  = cw_field(apphot_data_insert, /floating, /return_events, uvalue = 'spectralVmR', $
-                                      value = state.photSpecVmR, title='V-R', xsize = 5, /row)
+    state.photSpec_VmR_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralVmR', $
+                                      value = state.photSpecVmR, title='V-R', xsize = 4, /row)
                                 
-    state.photSpec_BmR_ID  = cw_field(apphot_data_insert, /floating, /return_events, uvalue = 'spectralBmR', $
-                                      value = state.photSpecBmR, title='B-R', xsize = 5, /row)   
+    state.photSpec_BmR_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralBmR', $
+                                      value = state.photSpecBmR, title='B-R', xsize = 4, /row)   
 
-                                                     
-    tmp_string1 = $
-      string(99999.0, 99999.0, $
-             format = '("Object position: (",f6.1,", ",f6.1,")")')
-    
- ;   position_label = widget_label(apphot_data_base1a,value='Object position:')
-
-    state.centerpos_id = widget_label(apphot_data_base1a, value = tmp_string1, uvalue = 'centerpos')
-
-    state.apphot_wcs_id = widget_label(apphot_data_base1a,value='---No WCS Info---',/dynamic_resize)
-
-    state.centerbox_id = $
-      cw_field(apphot_data_base1a, $
-               /long, $
-               /return_events, $
-               title = 'Centering box size (px):', $
-               uvalue = 'centerbox', $
-               value = state.centerboxsize, $
-               xsize = 5)
-    
-    state.radius_id = $
-      cw_field(apphot_data_base1a, $
-               /floating, $
-               /return_events, $
-               title = ' Aperture radius:', $
-               uvalue = 'radius', $
-               value = state.aprad, $
-               xsize = 8)
-    
-    state.innersky_id = $
-      cw_field(apphot_data_base1a, $
-               /floating, $
-               /return_events, $
-               title = 'Inner sky radius:', $
-               uvalue = 'innersky', $
-               value = state.innersky, $
-               xsize = 8)
-    
-    state.outersky_id = $
-      cw_field(apphot_data_base1a, $
-               /floating, $
-               /return_events, $
-               title = 'Outer sky radius:', $
-               uvalue = 'outersky', $
-               value = state.outersky, $
-               xsize = 8)
-    
-    photzoom_widget_id = widget_draw( $
-         apphot_plot_base,$
-         scr_xsize=state.photzoom_size, scr_ysize=state.photzoom_size)
-
-        state.photwarning_id = $
-      widget_label(apphot_data_base2, $
-                   value='-------------------------', $
-                   /dynamic_resize)
-
-    tmp_string4 = string(0.0, format='("FWHM (pix): ",g15.6)' )
-    state.fwhm_id = widget_label(apphot_data_base2, $
-                                 value=tmp_string4, $
-                                 uvalue='fwhm')
-
-    tmp_string3 = string(10000000.00, $
-                         format = '("Sky level: ",g12.6)' )
-    
-    state.skyresult_id = $
-      widget_label(apphot_data_base2, $
-                   value = tmp_string3, $
-                   uvalue = 'skyresult')
-    
-    tmp_string2 = string(1000000000.00, $
-                         format = '("Object counts: ",g12.6)' )
-    
-    state.photresult_id = $
-      widget_label(apphot_data_base2, $
-                   value = tmp_string2, $
-                   uvalue = 'photresult')
-
-    tmp_string2 = '                           '
-
-    state.photerror_id = $
-      widget_label(apphot_data_base2, $
-                   value = tmp_string2, $
-                   uvalue = 'photerror')
-
+                 
+    ; populate apphot_data_base1
     apphot_cycle_base = widget_base(apphot_data_base1,/row)
-    phot_cycle_left = widget_button(apphot_cycle_base,value='<---',uvalue='cycle_left')
-    phot_cycle_right = widget_button(apphot_cycle_base,value='--->',uvalue='cycle_right')
-    do_all = widget_button(apphot_cycle_base,value='Do all',uvalue='do_all')
+    
+    phot_cycle_left   = widget_button(apphot_cycle_base, value=' <---- ',  uvalue='cycle_left')
+    phot_cycle_right  = widget_button(apphot_cycle_base, value=' ----> ',  uvalue='cycle_right')
+    do_all            = widget_button(apphot_cycle_base, value=' Do all ', uvalue='do_all')
 
-    photsettings_id = $
-      widget_button(apphot_data_base1, $
-                    value = 'Photometry settings...', $
-                    uvalue = 'photsettings',xsize=160)
+    photsettings_id   = widget_button(apphot_data_base1, value = 'Photometry settings ...', $
+                                                        uvalue = 'photsettings', xsize=175)
 
     if (state.photprint EQ 0) then begin
-       photstring = 'Write results to file...'
+       photstring = 'Write results to file ...'
     endif else begin
        photstring = 'Close photometry file'
     endelse
     
-    state.photprint_id = $
-      widget_button(apphot_data_base1, $
-                     value = photstring, $
-                     uvalue = 'photprint',xsize=160)
+    state.photprint_id   = widget_button(apphot_data_base1, value = photstring, $
+                                                           uvalue = 'photprint', xsize=175)
 
-    state.showradplot_id = $
-      widget_button(apphot_data_base1, $
-                    value = 'Show radial profile', $
-                    uvalue = 'showradplot',xsize=160)
+    state.showradplot_id = widget_button(apphot_data_base1, value = 'Show radial profile', $
+                                                           uvalue = 'showradplot', xsize=175)
 
-    state.radplot_widget_id = $
-      widget_draw(apphot_draw_base, scr_xsize=1, scr_ysize=1)
-      ysize = 300 < (state.screen_ysize - 300)
-      widget_control, state.radplot_widget_id, xsize=500, ysize=ysize
-      widget_control, state.showradplot_id, set_value='Hide radial profile'
-      
-    apphot_done = $
-      widget_button(apphot_data_base2, $
-                    value = 'Done', $
-                    uvalue = 'apphot_done')
+    state.radplot_widget_id = widget_draw(apphot_draw_base, scr_xsize=1, scr_ysize=1)
+    
+    ysize = 300 < (state.screen_ysize - 300)
+    widget_control, state.radplot_widget_id, xsize=500, ysize=ysize
+    widget_control, state.showradplot_id, set_value='Hide radial profile'   
+    
+    photzoom_widget_id = widget_draw(apphot_plot_base, scr_xsize=state.photzoom_size, scr_ysize=state.photzoom_size)
+
+    ; populate apphot_data_base2
+    fldmask = 'XXXXXXXXX: XX.XX X X.XX | XXXXX: XX.XX'
+        
+    state.photwarning_id = widget_label(apphot_data_base2, value=fldmask, /dynamic_resize)
+
+    state.objfwhm_id = widget_label(apphot_data_base2, value=fldmask, uvalue='fwhm', /align_left)                  ; FWHM / SNR
+   
+    state.photresult_id = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photresult', /align_left)  ; Obj Mag +/- err
+
+    state.skyresult_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'skyresult', /align_left)   ; Sky Bkg +/- err
+ 
+    state.photerror_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photerror', /align_left)   ; Inst Prec / Limit Mag
+
+    apphot_done = widget_button(apphot_data_base2, value = 'Done', uvalue = 'apphot_done')
 
     widget_control, apphot_base,/realize
 
@@ -12576,6 +12721,16 @@ endif
 
 phast_apphot_refresh
 
+end
+
+pro phast_setAperFWHM ; update aperture FWHM and units
+common phast_state
+  case state.magunits of
+    0: FWHM = state.phot_aperFWHM
+    1: FWHM = state.phot_aperFWHM * state.pixelScale                     
+  endcase
+  widget_control, state.phot_aperFWHM_id, set_value = round(100*FWHM)/100.0
+  widget_control, state.phot_aperUnit_ID, set_value = state.phot_aperList[state.magunits]
 end
 
 ;--------------------------------------------------------------------
