@@ -10558,10 +10558,12 @@ case uvalue of
                                          get_path = tmp_dir, $
                                          /write)
           
-          if (photfilename EQ '') then return
+          if (photfilename EQ '') then begin
+             return
+          endif else state.photfilename = photfilename
 
           ; write header to output file
-          openw, photfile, photfilename, /get_lun, /append
+          openw, photfile, state.photfilename, /get_lun, /append
           state.photfile = photfile
 
           if (state.magunits EQ 0) then begin
@@ -12569,7 +12571,7 @@ if (not (xregistered('phast_apphot', /noshow))) then begin
         
     state.photwarning_id = widget_label(apphot_data_base2, value=fldmask, /dynamic_resize)
 
-    state.objfwhm_id = widget_label(apphot_data_base2, value=fldmask, uvalue='fwhm', /align_left)                  ; FWHM / SNR
+    state.fwhm_id = widget_label(apphot_data_base2, value=fldmask, uvalue='fwhm', /align_left)                  ; FWHM / SNR
    
     state.photresult_id = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photresult', /align_left)  ; Obj Mag +/- err
 
