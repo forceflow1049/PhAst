@@ -9,3 +9,4 @@
 -Modifications to coordinate zeropoint determination with Sextractor KRON photometry.[Robert Crawford]
 -Make automatic sizing of photometric apertures an option. [Robert Crawford]
 -Upgrade and polish point-click photometry function. [Robert Crawford]
+-Make phot_rad_plot_open a config file option. [Robert Crawford]

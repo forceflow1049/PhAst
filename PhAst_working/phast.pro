@@ -162,7 +162,8 @@ mpc = { $
         }
 
 state = {                   $
-        custom_catalogs: '', $  ;filename of catalog definitions
+        custom_catalogs: '', $  ;filename of catalog definitions 
+        phot_rad_plot_open: 1,$ ;is the radial plot shown by default?
         kernel_list: '', $      ;path to file with kernel list
         spice_box_id: 0L, $     ;widget id for spice control box
         check_updates: 0, $     ;check for updates on startup? 1=yes
@@ -586,6 +587,7 @@ if file_test('phast.conf') eq 1 then begin
             'photerrors': state.photerrors = fix(val[i])
             'skytype': state.skytype = fix(val[i])
             'magunits': state.magunits = fix(val[i])
+            'phot_rad_plot_open': state.phot_rad_plot_open = fix(val[i])
             ;MPC reporting
             'mpc_net': mpc.net = val[i]
             'mpc_com': mpc.com = val[i]
@@ -12543,26 +12545,39 @@ if (not (xregistered('phast_apphot', /noshow))) then begin
        photstring = 'Close photometry file'
     endelse
     
-    state.photprint_id = $
-      widget_button(apphot_data_base1, $
-                     value = photstring, $
-                     uvalue = 'photprint',xsize=160)
+    state.photprint_id   = widget_button(apphot_data_base1, value = photstring, $
+                                                           uvalue = 'photprint', xsize=175)
 
-    state.showradplot_id = $
-      widget_button(apphot_data_base1, $
-                    value = 'Show radial profile', $
-                    uvalue = 'showradplot',xsize=160)
+    state.showradplot_id = widget_button(apphot_data_base1, value = 'Show radial profile', $
+                                                           uvalue = 'showradplot', xsize=175)
 
-    state.radplot_widget_id = $
-      widget_draw(apphot_draw_base, scr_xsize=1, scr_ysize=1)
+    state.radplot_widget_id = widget_draw(apphot_draw_base, scr_xsize=1, scr_ysize=1)
+    
+    if state.phot_rad_plot_open eq 1 then begin
       ysize = 300 < (state.screen_ysize - 300)
       widget_control, state.radplot_widget_id, xsize=500, ysize=ysize
-      widget_control, state.showradplot_id, set_value='Hide radial profile'
-      
-    apphot_done = $
-      widget_button(apphot_data_base2, $
-                    value = 'Done', $
-                    uvalue = 'apphot_done')
+      widget_control, state.showradplot_id, set_value='Hide radial profile' 
+    endif else begin
+      widget_control, state.radplot_widget_id, xsize=500, ysize=1
+      widget_control, state.showradplot_id, set_value='Show radial profile'
+    endelse
+ 
+    photzoom_widget_id = widget_draw(apphot_plot_base, scr_xsize=state.photzoom_size, scr_ysize=state.photzoom_size)
+
+    ; populate apphot_data_base2
+    fldmask = 'XXXXXXXXX: XX.XX X X.XX | XXXXX: XX.XX'
+        
+    state.photwarning_id = widget_label(apphot_data_base2, value=fldmask, /dynamic_resize)
+
+    state.objfwhm_id = widget_label(apphot_data_base2, value=fldmask, uvalue='fwhm', /align_left)                  ; FWHM / SNR
+   
+    state.photresult_id = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photresult', /align_left)  ; Obj Mag +/- err
+
+    state.skyresult_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'skyresult', /align_left)   ; Sky Bkg +/- err
+ 
+    state.photerror_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photerror', /align_left)   ; Inst Prec / Limit Mag
+
+    apphot_done = widget_button(apphot_data_base2, value = 'Done', uvalue = 'apphot_done')
 
     widget_control, apphot_base,/realize
 
