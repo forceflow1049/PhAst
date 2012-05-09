@@ -174,8 +174,8 @@ state = {                     $
         batch_source: -1, $     ;what images to calibrate?
         batch_select_dir: 0L, $ ;widget id for dir select button
         batch_dirname: '', $    ;location of image batch
-        fits_crota2:0.0, $      ;holds dec rotation (deg)
-        fits_crota1:0.0, $      ;holds ra rotation (deg)
+        fits_crota2:-999.9,   $ ;holds dec rotation (deg)
+        fits_crota1:-999.9,   $ ;holds ra rotation (deg)
         fits_cdelt2:0.0, $      ;holds y plate scale (deg)
         fits_cdelt1:0.0, $      ;holds x plate scale (deg)
         batch_dir_id: 0L, $     ;widget id for batch dir display
@@ -415,7 +415,7 @@ state = {                     $
         photwarning: ' ', $     ; photometry warning text
         photerrors: 0, $        ; calculate photometric errors
         objfwhm_id: 0L,       $ ; id of photometry fwhm widget
-        objfwhm: 2.0,         $ ; object fwhm (latest measured) (pixel units)
+        objfwhm: 0.0,         $ ; object fwhm (latest measured) (pixel units)
         pixelscale: 0.0,      $ ; pixel scale, arcsecs/pixel        
         ccdgain: 3.0, $         ; CCD gain
         ccdrn: 0.0, $           ; read noise
@@ -600,6 +600,12 @@ if file_test('phast.conf') eq 1 then begin
             'skytype': state.skytype = fix(val[i])
             'magunits': state.magunits = fix(val[i])
             'phot_rad_plot_open': state.phot_rad_plot_open = fix(val[i])
+            'ccdrotangle': begin
+              state.fits_crota1 = float(val[i])
+              state.fits_crota2 = float(val[i])
+              state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
+              state.fits_cdelt2 = -state.fits_cdelt1
+              end
             ;MPC reporting
             'mpc_net': mpc.net = val[i]
             'mpc_com': mpc.com = val[i]
@@ -627,7 +633,24 @@ if file_test('phast.conf') eq 1 then begin
             else: print, 'Parameter '+var[i]+' not found in phast_state!'
         endcase
     endfor
+    ;
     ;now, process any state defaults based on inputs
+    if state.pixelscale le 0 then begin
+       print, 'Warning: CCD pixel scale has not been set.  Defaulting to 1.0" per pixel.'
+       state.pixelscale = 1.0
+       state.magunits = 0
+    endif
+    if state.objfwhm le 0 then begin
+       print, 'Warning: Nominal seeing has not been set.  Defaulting to 2 x pixel scale.'
+       state.objfwhm = 2.0 * state.pixelscale 
+    endif
+    if state.fits_crota1 lt -999.0 or state.fits_crota2 lt -999.0 then begin
+       print, 'Warning: CCD rotation angle has not been set.  Defaulting to 90 degrees.'
+       state.fits_crota1 = 90.0
+       state.fits_crota2 = 90.0
+       state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(state.fits_crota1*!pi/180.0)
+       state.fits_cdelt2 = -state.fits_cdelt1
+    endif
     ;
     ; set photometric apertures based on typical object fwhm to be consistent with sextractor apertures
     if finite(state.objfwhm) then begin
@@ -9794,7 +9817,7 @@ for i = 0L, (ys-1) do $         ; row loop
 ycen = total(cenyy) / total(cut) + y0
 
 if (abs(xcen-state.cursorpos[0]) gt MAXSHIFT) or $
-  (abs(ycen-state.cursorpos[1]) gt MAXSHIFT) then begin
+   (abs(ycen-state.cursorpos[1]) gt MAXSHIFT) then begin
     state.photwarning = 'Warning: Possible mis-centering?'
 endif
 
@@ -10129,7 +10152,6 @@ pro phast_imcenterg, image, xcenter, ycenter, apr, skyrad, badpix, xcentroid, yc
   skystd = sqrt(skyvar)
   if (skystd LT 0.0) then goto, BADSTAR 
 
- 
 ; Centroid the aperture
   thisap  = where( r LT apr )           ; select pixels within radius
   thisapd = rotbuf[thisap]
@@ -10213,7 +10235,7 @@ if (state.phot_aperType EQ 1 And state.centerboxsize NE 0) then begin ; centroid
     for ipass = 1, 2 do begin
       phast_imcenterg, main_image, x, y, state.innersky, [state.innersky, state.outersky], [0, 65535], xcentroid, ycentroid
       x = xcentroid
-      y = ycentroid 
+      y = ycentroid
     endfor     
 endif
 if (state.phot_aperType EQ 2 Or state.centerboxsize EQ 0) then begin ; use cursor position
@@ -11368,7 +11390,7 @@ case imgBand of  ; determine if catalog supports the filter passband
            magzbnd = 'b'
         endif else begin
            msgarr = strarr(2)
-           msgarr(0) = 'Photometric ' + imgBand + ' zeropoint can not be determined'
+           msgarr(0) = imgBand + ' zeropoint can not be determined'
            msgarr(1) = state.photcatalog_name + ' is missing b'                                                                               
            return
         endelse
@@ -11385,7 +11407,7 @@ case imgBand of  ; determine if catalog supports the filter passband
             magzbnd = 'r'
           endif else begin
             msgarr = strarr(2)
-            msgarr(0) = 'Photometric ' + imgBand + ' zeropoint can not be determined'
+            msgarr(0) = imgBand + ' zeropoint can not be determined'
             msgarr(1) = state.photcatalog_name + ' is missing r'                                                                               
             return
           endelse
@@ -11398,7 +11420,7 @@ case imgBand of  ; determine if catalog supports the filter passband
            magzbnd = 'r'
         endif else begin
            msgarr = strarr(2)
-           msgarr(0) = 'Photometric ' + imgBand + ' zeropoint can not be determined'
+           msgarr(0) = imgBand + ' zeropoint can not be determined'
            msgarr(1) = state.photcatalog_name + ' is missing r'                                                                               
            return
         endelse
@@ -11415,7 +11437,7 @@ case imgBand of  ; determine if catalog supports the filter passband
             magzbnd = 'v'
           endif else begin
             msgarr = strarr(2)
-            msgarr(0) = 'Photometric ' + imgBand + ' zeropoint can not be determined'
+            msgarr(0) = imgBand + ' zeropoint can not be determined'
             msgarr(1) = state.photcatalog_name + ' is missing v,r magnitudes'                                                                               
             return
           endelse
@@ -11424,13 +11446,20 @@ case imgBand of  ; determine if catalog supports the filter passband
 endcase
 
 good = where( finite(cat_Mag) and finite(cat_Err) and finite(cat_BmR) )  ; reduce to surviving catalog entries
-if n_elements(good) lt n_elements(cat_BmR) then begin
-   index = indgen(n_elements(cat_BmR))
-   remove, good, index ; index is now bad points
-   if countBmR gt 0 then begin
-      remove, index, cat_RA, cat_dec, cat_Mag, cat_Err, cat_Bmr, cat_Bmag, cat_ErrB, cat_VMag, cat_ErrV, cat_RMag, cat_ErrR
+if 2 lt n_elements(good) then begin
+   if n_elements(good) lt n_elements(cat_BmR) then begin
+      index = indgen(n_elements(cat_BmR))
+      remove, good, index ; index is now bad points
+      if countBmR gt 0 then begin
+         remove, index, cat_RA, cat_dec, cat_Mag, cat_Err, cat_Bmr, cat_Bmag, cat_ErrB, cat_VMag, cat_ErrV, cat_RMag, cat_ErrR
+      endif
    endif
-endif
+endif else begin
+   msgarr = strarr(2)
+   msgarr(0) = imgBand + ' zeropoint can not be determined'
+   msgarr(1) = state.photcatalog_name + ' has insufficient data for this field'
+   return                                                                        
+endelse
 
 ; 3) determine instrumental instMages
 textstr = '-CATALOG_TYPE ASCII_HEAD -PARAMETERS_NAME zeropoint.param ' +   $
@@ -11439,10 +11468,10 @@ textstr = '-CATALOG_TYPE ASCII_HEAD -PARAMETERS_NAME zeropoint.param ' +   $
                                                              
 phast_do_sextractor, image=state.imagename, flags=textstr, cat_name='./output/catalogs/zeropoint.cat'
 readcol, './output/catalogs/zeropoint.cat', im_ra, im_dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
-phot_event
+
 ; qualify SExtractor detections
 Instr( where(   flags gt  0  ) ) = !values.F_NAN  ; avoid complicated/corrupted detections
-Instr( where(   Instr ge 99.0) ) = !values.F_NAN  ; avoid sextractor missing value code (99.0)
+Instr( where(   Instr ge 99.0) ) = !values.F_NAN  ; avoid sextractor missing vlue code (99.0)
 Instr( where(errInstr ge 99.0) ) = !values.F_NAN  ; avoid sextractor missing value code (99.0)
 
 signal = 10^(-0.4*Instr)  &  sigma = 10^(-0.4*errInstr)  &  SNR = signal/sigma
@@ -11453,13 +11482,20 @@ Instr( where(SNR lt 10.0) ) = !values.F_NAN       ; avoid low SNR detections
 errInstr = -2.5*alog10(sigma  / sqrt(exposure))
 
 good = where( finite(Instr) and finite(errInstr) )  ; reduce to surviving detections
-if n_elements(good) lt n_elements(Instr) then begin
-   index = indgen(n_elements(Instr))
-   remove, good, index ; index is now bad points
-   if countBmR gt 0 then begin
-      remove, index, im_ra, im_dec, Instr, errInstr, flags
+if 2 lt n_elements(good) then begin
+   if n_elements(good) lt n_elements(Instr) then begin
+      index = indgen(n_elements(Instr))
+      remove, good, index ; index is now bad points
+      if countBmR gt 0 then begin
+         remove, index, im_ra, im_dec, Instr, errInstr, flags
+      endif
    endif
-endif
+endif else begin
+   msgarr = strarr(2)
+   msgarr(0) = imgBand + ' zeropoint can not be determined'
+   msgarr(1) = 'SExtractor has detected two few objects (N<3) for this field'
+   return                                                                        
+endelse
   
 ; 4) match catalog to image
    Cat = make_array(1,n_elements(im_ra),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold the R magnitude of matching star
@@ -11493,13 +11529,20 @@ cosDec = cos(im_dec*3.1415926535/180.0)
   
   ;reduce to matching and non-missing data
   good = where( finite(BmR) )
-  if n_elements(good) lt n_elements(Cat) then begin
-    index = indgen(n_elements(Cat))
-    remove, good, index ; index is now bad points
-    if countBmR gt 0 then begin
-      remove, index, im_ra, im_dec, flags, Y, errY, Instr, errInstr, Cat, errCat, BmR, errBmR
-    endif
-  endif
+  if 2 lt n_elements(good) then begin
+     if n_elements(good) lt n_elements(Cat) then begin
+        index = indgen(n_elements(Cat))
+        remove, good, index ; index is now bad points
+        if countBmR gt 0 then begin
+           remove, index, im_ra, im_dec, flags, Y, errY, Instr, errInstr, Cat, errCat, BmR, errBmR
+        endif
+     endif
+  endif else begin
+     msgarr = strarr(2)
+     msgarr(0) = imgBand + ' zeropoint can not be determined'
+     msgarr(1) = 'Too few objects (N<3) have been matched to ' + state.photcatalog_name
+     return                                                                        
+  endelse
   
 ; 5) Solve in <= 5 passes with outlier rejection at sigmaClip level after each pass (except last)
 openw, 1, './output/photoZeroPointF.csv'  ; dataset at start of solution
@@ -11525,14 +11568,6 @@ repeat begin
   endif
   
 endrep until (total(outliers) eq 0) or (ipass eq maxpass)
-
-;covar=transpose(errCat)*errBmR
-;xvcovar=fltarr(n_elements(Y))
-;xvcovar=covar
-;LINMIX_ERR, BmR, Y, POST, XSIG=errBmR, YSIG=errY, XYCOV=xycovar, /METRO
-
-;B0 = robust_poly_fit(BmR, Y, 1, Yfit, sigmaY)
-;if B0[0] eq 0 Then retCode = 0 else retCode = 1
   
 openw, 1, './output/photoZeroPoint.csv'
 for i=0, n_elements(Instr)-1 do begin
@@ -12531,7 +12566,6 @@ common phast_state
 
 offset = [0,0]
 if state.align_toggle eq 1 then offset = phast_get_image_offset()
-
 state.cursorpos = state.coord - offset
 
 ;update the exposure length and zero-point from image header

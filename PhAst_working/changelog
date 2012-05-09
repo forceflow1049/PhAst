@@ -10,4 +10,5 @@
 -Make automatic sizing of photometric apertures an option. [Robert Crawford]
 -Upgrade and polish point-click photometry function. [Robert Crawford]
 -Make phot_rad_plot_open a config file option. [Robert Crawford]
--Push back draft final pre-filter version
+-Push back draft final pre-filter version [Robert Crawford]
+-Push back draft final with config file and zeropoint fixes [Robert Crawford]
