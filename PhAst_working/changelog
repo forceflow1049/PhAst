@@ -12,3 +12,5 @@
 -Make phot_rad_plot_open a config file option. [Robert Crawford]
 -Push back draft final pre-filter version [Robert Crawford]
 -Push back draft final with config file and zeropoint fixes [Robert Crawford]
+-fixed bug in which aligning stars only worked at default zoom value [Morgan Rehnberg]
+

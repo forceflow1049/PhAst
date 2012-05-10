@@ -3130,8 +3130,9 @@ pro phast_displaymain
 common phast_state
 common phast_images
 offset = [0,0]
-if state.align_toggle eq 1 then offset = phast_get_image_offset()
+if state.align_toggle eq 1 then offset = state.zoom_factor*phast_get_image_offset()
 phast_setwindow, state.draw_window_id
+
 
 if state.align_toggle eq 1 then tv, display_image,offset[0],offset[1]
 if state.align_toggle ne 1 then tv, display_image
