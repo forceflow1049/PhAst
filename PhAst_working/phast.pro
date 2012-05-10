@@ -298,7 +298,7 @@ state = {                     $
         pan_window_size: 121L, $ ; size of pan window
         pan_scale: 0.0, $       ; magnification of pan image
         image_size: [0L,0L], $  ; size of main_image
-        invert_colormap: 1L, $  ; 0=normal, 1=inverted
+        invert_colormap: 0L, $  ; 0=normal, 1=inverted
         coord: [0L, 0L],  $     ; cursor position in image coords
         scaling: 3, $           ; 0=lin,1=log,2=histeq,3=asinh
         asinh_beta: 0.1, $      ; asinh nonlinearity parameter
@@ -628,6 +628,7 @@ if file_test('phast.conf') eq 1 then begin
             ;other
             'align_toggle': state.align_toggle = fix(val[i])
             'check_updates':state.check_updates = fix(val[i])
+            'invert_colormap': state.invert_colormap = fix(val[i])
 
 
             else: print, 'Parameter '+var[i]+' not found in phast_state!'
