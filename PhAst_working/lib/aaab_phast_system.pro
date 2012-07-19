@@ -3800,7 +3800,7 @@ end
 
 ;----------------------------------------------------------------------
 
-pro phast_system
+pro aaab_phast_system
 
 ;for compilation purposes only
 

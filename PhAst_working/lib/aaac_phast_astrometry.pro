@@ -687,7 +687,7 @@ END
 
 ;---------------------------------------------------------------------
 
-pro phast_astrometry
+pro aaac_phast_astrometry
 
 ;for compilation purposes only
 

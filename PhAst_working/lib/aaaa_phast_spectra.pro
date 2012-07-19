@@ -738,7 +738,7 @@ end
 
 ;------------------------------------------------------------------
 
-pro phast_spectra
+pro aaaa_phast_spectra
 
 ;for compilation purposes only
 
