@@ -161,8 +161,6 @@ pro phast_initcommon
     }
     
   state = {                $
-    archive_size: 25, $     ;number of chunks created
-    archive_chunk_size: 25,$;block size for incresing archive
     phot_rad_plot_open: 1, $
     kernel_list: '', $      ;path to file with kernel list
     spice_box_id: 0L, $     ;widget id for spice control box
@@ -303,7 +301,7 @@ pro phast_initcommon
     pan_window_size: 121L, $ ; size of pan window
     pan_scale: 0.0, $       ; magnification of pan image
     image_size: [0L,0L], $  ; size of main_image
-    invert_colormap: 0L, $  ; 0=normal, 1=inverted
+    invert_colormap: 1L, $  ; 0=normal, 1=inverted
     coord: [0L, 0L],  $     ; cursor position in image coords
     scaling: 3, $           ; 0=lin,1=log,2=histeq,3=asinh
     asinh_beta: 0.1, $      ; asinh nonlinearity parameter
@@ -498,7 +496,7 @@ pro phast_initcommon
   blink_image1 = 0
   blink_image2 = 0
   blink_image3 = 0
-  image_archive = objarr(25)
+  image_archive = objarr(1)
   star_catalog=0
   cal_science = 0
   cal_dark = 0
@@ -529,16 +527,23 @@ cd, 'lib'
 
 filelist =findfile('*.pro')
 
-for j=0, 1 do begin ;need multiple compiles for some reason
-   for i=0, n_elements(filelist)-1 do begin
-      temp = strsplit(filelist[i],'.',/extract)
-      if (temp[0] eq 'cmps_form') or( temp[0] eq 'dialog_input') $
-         or (temp[0] eq 'read_vicar') or (temp[0] eq 'vicgetpars') then begin
-         resolve_routine, temp[0], /compile_full_file, /is_function
+
+for i=0, n_elements(filelist)-1 do begin
+   temp = strsplit(filelist[i],'.',/extract)
+   if (temp[0] eq 'cmps_form') or( temp[0] eq 'dialog_input') $
+   or (temp[0] eq 'read_vicar') or (temp[0] eq 'vicgetpars') then begin
+      resolve_routine, temp[0], /compile_full_file, /is_function
       endif else resolve_routine, temp[0], /compile_full_file
-   endfor
 endfor
 
+;; resolve_routine, 'aaaa_phast_spectra', /compile_full_file
+;; resolve_routine, 'phast_system', /compile_full_file
+;; resolve_routine, 'phast_astrometry', /compile_full_file
+;; resolve_routine, 'phast_display' , /compile_full_file
+;; resolve_routine, 'phast_photometry', /compile_full_file
+;; resolve_routine, 'phast_mpc', /compile_full_file
+;; resolve_routine, 'phast_pipeline', /compile_full_file
+;; resolve_routine, 'phast_other', /compile_full_file
 cd, '../'
 end
 

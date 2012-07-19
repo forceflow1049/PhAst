@@ -186,7 +186,9 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
      if not keyword_set(dir_add) then begin
         if state.num_images gt 0 then begin ;check not first image
            state.num_images++
-           if state.num_images gt state.archive_chunk_count*state.archive_chunk_size then phast_expand_archive
+           temp_arr = image_archive
+           image_archive = objarr(state.num_images)
+           for i=0, state.num_images-2 do image_archive[i] = temp_arr[i]
            image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
            image_archive[state.num_images-1]->set_image, new_image
            image_archive[state.num_images-1]->set_name, filename
@@ -197,6 +199,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
            state.current_image_index = state.num_images-1
         endif else begin        ;handle first image add
            state.num_images++
+           image_archive = objarr(1)
            image_archive[0] = obj_new('phast_image') ;create new image object
            image_archive[0]->set_image, new_image
            image_archive[0]->set_name, filename
@@ -206,24 +209,26 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
         endelse
      endif else begin           ;handle directory add
         if keyword_set(dir_num) then begin
-           ;; if state.num_images gt 0 then begin
-              phast_expand_archive, num=dir_num
+           if state.num_images gt 0 then begin
+              temp_image = image_archive
+              image_archive = objarr(state.num_images+dir_num)
+              for i=0, state.num_images-1 do image_archive[i] = temp_image[i]
               image_archive[state.num_images] = obj_new('phast_image') ;create new image object
               image_archive[state.num_images]->set_image, new_image
               image_archive[state.num_images]->set_name, filename
               image_archive[state.num_images]->set_header, head
               image_archive[state.num_images]->set_rotation,0.0
               state.num_images++
+           endif else begin     ;handle first image add
+              state.num_images++
+              image_archive = objarr(dir_num)
+              image_archive[0] = obj_new('phast_image') ;create new image object
+              image_archive[0]->set_image, new_image
+              image_archive[0]->set_name, filename
+              image_archive[0]->set_header, head
+              image_archive[0]->set_rotation,0.0
               newimage = 1
-           ;; endif else begin     ;handle first image add
-           ;;    state.num_images++
-           ;;    image_archive[0] = obj_new('phast_image') ;create new image object
-           ;;    image_archive[0]->set_image, new_image
-           ;;    image_archive[0]->set_name, filename
-           ;;    image_archive[0]->set_header, head
-           ;;    image_archive[0]->set_rotation,0.0
-           ;;    newimage = 1
-           ;; endelse
+           endelse
         endif else begin
            image_archive[state.num_images] = obj_new('phast_image') ;create new image object
            image_archive[state.num_images]->set_image, new_image
@@ -1105,26 +1110,6 @@ pro phast_event, event
      else:  print, 'No match for uvalue....' ; bad news if this happens
   endcase
   widget_control, state.draw_base_id, /input_focus
-end
-
-;---------------------------------------------------------------
-
-pro phast_expand_archive, num=num
-
-;expand archive by the amount specified by num.  If num is not
-;specified, use state.archive_chunk_size
-
-common phast_state
-common phast_images
-
-if not keyword_set(num) then num = state.archive_chunk_size
-
-
-state.archive_size += num
-temp_arr = image_archive
-
-image_archive = objarr(state.archive_size)
-image_archive[0] = temporary(temp_arr)
 end
 
 ;---------------------------------------------------------------
@@ -2619,11 +2604,7 @@ pro phast_shutdown, windowid
   
   if (state.photprint EQ 1) then begin
     free_lun, state.photfile
- endif
-
-  ; destroy the image archive and release all pointers
-  obj_destroy, image_archive
-  image_archive = 0
+  endif
   
   ; reset color table and pmulti to user values
   tvlct, user_r, user_g, user_b

@@ -24,7 +24,6 @@ phast_system: contains common blocks and archives and basic routines
      phast_draw_vector_event
      phast_draw_zoom_event
      phast_event
-     phast_expand_archive
      phast_fitsext_read
      phast_fpack_read
      phast_getdss

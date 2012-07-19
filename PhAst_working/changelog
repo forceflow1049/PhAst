@@ -1,1 +1,2 @@
--PhAst split into nine diles, stored in lib direcotry [Morgan Rehnberg]
+-PhAst split into nine files, stored in lib direcotry [Morgan Rehnberg]
+-Fixed huge memory leak in image archive.  Memory should be totally conserved now [Morgan Rehnberg]
