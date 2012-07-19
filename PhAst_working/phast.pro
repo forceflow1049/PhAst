@@ -524,14 +524,26 @@ pro phast_compile_modules
   ;routine to compile other PhAst procdueres on startup
 
 cd, 'lib'
-resolve_routine, 'phast_spectra', /compile_full_file
-resolve_routine, 'phast_system', /compile_full_file
-resolve_routine, 'phast_astrometry', /compile_full_file
-resolve_routine, 'phast_display' , /compile_full_file
-resolve_routine, 'phast_photometry', /compile_full_file
-resolve_routine, 'phast_mpc', /compile_full_file
-resolve_routine, 'phast_pipeline', /compile_full_file
-resolve_routine, 'phast_other', /compile_full_file
+
+filelist =findfile('*.pro')
+
+
+for i=0, n_elements(filelist)-1 do begin
+   temp = strsplit(filelist[i],'.',/extract)
+   if (temp[0] eq 'cmps_form') or( temp[0] eq 'dialog_input') $
+   or (temp[0] eq 'read_vicar') or (temp[0] eq 'vicgetpars') then begin
+      resolve_routine, temp[0], /compile_full_file, /is_function
+      endif else resolve_routine, temp[0], /compile_full_file
+endfor
+
+;; resolve_routine, 'aaaa_phast_spectra', /compile_full_file
+;; resolve_routine, 'phast_system', /compile_full_file
+;; resolve_routine, 'phast_astrometry', /compile_full_file
+;; resolve_routine, 'phast_display' , /compile_full_file
+;; resolve_routine, 'phast_photometry', /compile_full_file
+;; resolve_routine, 'phast_mpc', /compile_full_file
+;; resolve_routine, 'phast_pipeline', /compile_full_file
+;; resolve_routine, 'phast_other', /compile_full_file
 cd, '../'
 end
 
