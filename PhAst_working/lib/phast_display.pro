@@ -423,7 +423,7 @@ pro phast_colorbar
         
   phast_setwindow, state.colorbar_window_id
   
-  xsize=250
+  xsize=243
   
   b = congrid( findgen(state.ncolors), xsize) + 8
   c = replicate(1, state.colorbar_height)
@@ -786,9 +786,18 @@ pro phast_display_stars
   common phast_pdata
   
   if ptr_valid(state.astr_ptr) then begin
-    phast_getFieldEpoch, a, d,radius, X, obsDate
-    catalog_name = state.overlay_catList(state.overlay_catalog)
-    star_catalog = phast_get_stars(a,d,radius,AsOf=obsDate,catalog_name=catalog_name)
+     if (not image_archive[state.current_image_index]->catalog_valid()) or $
+     (image_archive[state.current_image_index]->get_catalog_type() ne state.overlay_catList(state.overlay_catalog)) then begin
+        phast_getFieldEpoch, a, d,radius, X, obsDate
+        catalog_name = state.overlay_catList(state.overlay_catalog)
+        
+        widget_control,state.search_msg_id,set_value='Downloading catalog region...'
+        star_catalog = phast_get_stars(a,d,radius,AsOf=obsDate,catalog_name=catalog_name)
+        image_archive[state.current_image_index]->set_catalog, star_catalog, catalog_name
+     endif else begin
+        star_catalog = image_archive[state.current_image_index]->get_catalog()
+        catalog_name = state.overlay_catList(state.overlay_catalog)
+     endelse
     
     band    = 'R'    &  mag   = star_catalog.RMag ;choose R mag
     clrband = 'B-R'  &  color = star_catalog.BMag - star_catalog.RMag
@@ -797,6 +806,7 @@ pro phast_display_stars
     name    = star_catalog.starID
     limit   = state.mag_limit
 
+    widget_control,state.search_msg_id,set_value='Matching stars...'
     ad2xy,ra,dec,*(state.astr_ptr),x,y
     select  = where(mag lt limit and x gt 0 and x lt state.image_size[0] and y gt 0 and y lt state.image_size[1])
 

@@ -31,8 +31,11 @@ phast_system: contains common blocks and archives and basic routines
      phast_image_switch
      phast_image__define
      phast_image::astr_valid
+     phast_image::catalog_valid
      phast_image::Cleanup
      phast_image::get_astr
+     phast_image::get_catalog
+     phast_image::get_catalog_type
      phast_image::get_header
      phast_image::get_image
      phast_image::get_name
@@ -40,6 +43,7 @@ phast_system: contains common blocks and archives and basic routines
      phast_image::get_size
      phast_image::init
      phast_image::set_astr
+     phast_image::get_catalog
      phast_image::set_header
      phast_image::set_image
      phast_image::set_name

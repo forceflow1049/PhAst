@@ -300,20 +300,30 @@ pro phast_check_updates,silent=silent
 
   common phast_state
   
-  new_version = webget('http://noao.edu/staff/mighell/phast/version.html')
-  if float(new_version.text[0]) gt float(state.version) then begin
-    changes = webget('http://noao.edu/staff/mighell/phast/changelog.html')
+  error = 0
+  catch, error_status
+  if error_status ne 0 then begin
+     print, 'No internet connection: updates not checked'
+     catch, /cancel
+     error = 1
+  endif
+
+  if error eq 0 then begin
+     new_version = webget('http://noao.edu/staff/mighell/phast/version.html')
+     if float(new_version.text[0]) gt float(state.version) then begin
+        changes = webget('http://noao.edu/staff/mighell/phast/changelog.html')
+        
+        if (!D.NAME eq 'WIN') then newline = string([13B, 10B]) else newline = string(10B) ; create newline
     
-    if (!D.NAME eq 'WIN') then newline = string([13B, 10B]) else newline = string(10B) ; create newline
-    
-    message = 'PhAst '+new_version.text[0]+' is now available!'+newline+newline+'Changes include:'
-    for i=0, n_elements(changes.text)-1 do message += newline+changes.text[i]
-    message += newline+newline+'Download PhAst '+new_version.text[0]+' at http://www.noao.edu/staff/mighell/phast/'
-    
-    result = dialog_message(message,/info,/center)
-  endif else begin
-    if not keyword_set(silent) then result = dialog_message('          PhAst is up to date!          ',/info,/center)
-  endelse
+        message = 'PhAst '+new_version.text[0]+' is now available!'+newline+newline+'Changes include:'
+        for i=0, n_elements(changes.text)-1 do message += newline+changes.text[i]
+        message += newline+newline+'Download PhAst '+new_version.text[0]+' at http://www.noao.edu/staff/mighell/phast/'
+        
+        result = dialog_message(message,/info,/center)
+     endif else begin
+        if not keyword_set(silent) then result = dialog_message('          PhAst is up to date!          ',/info,/center)
+     endelse
+  endif
 end
 
 ;----------------------------------------------------------------------
@@ -1354,6 +1364,8 @@ pro phast_image__define
 ;class definition for image class
   
   struct = {phast_image,$
+            catalog: ptr_new(), $ ;holds downloaded astrometric catalog
+            catalog_type: ptr_new(), $ ;what type of catalog is stored
             image: ptr_new(),$  ;array which holds the image data
             header_string: ptr_new(),$  ;holds the image header in string format
             header_struct: ptr_new(), $ ;holds the image header as a structure
@@ -1375,12 +1387,25 @@ function phast_image::astr_valid
   endif else return, 0
 end
 
- ;----------------------------------------------------------------------
+;----------------------------------------------------------------------
+
+function phast_image::catalog_valid
+  
+;routine to check if catalog data present
+  
+  if ptr_valid(self.catalog) then begin
+     return, 1
+  endif else return, 0
+end
+
+;----------------------------------------------------------------------
  
 pro phast_image::Cleanup
   
 ;Routine called by IDL destructor to free memory claimed by object
   
+  ptr_free,self.catalog
+  ptr_free, self.catalog_type
   ptr_free,self.image
   ptr_free,self.header_string
   ptr_free,self.header_struct
@@ -1397,6 +1422,24 @@ function phast_image::get_astr
 ;routine to return astrometry data for the image
   
   return,*(self.astr)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_catalog
+
+;routine to return a catalog 
+
+  return, *(self.catalog)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_catalog_type
+
+;routine to return a catalog type
+
+  return, *(self.catalog_type)
 end
 
 ;----------------------------------------------------------------------
@@ -1455,6 +1498,8 @@ function phast_image::init
   
 ;constructor for image class
   
+  self.catalog = ptr_new() ;this will be allocated when catalog is downloaded
+  self.catalog_type = ptr_new('')
   self.image = ptr_new(/allocate)
   self.header_string = ptr_new(/allocate)
   self.header_struct = ptr_new(/allocate)
@@ -1472,6 +1517,18 @@ pro phast_image::set_astr,new_astr
 ;routine to set the astrometry info for the image
   
   self.astr = ptr_new(new_astr)
+end
+
+;----------------------------------------------------------------------
+
+pro phast_image::set_catalog,new_catalog, type
+  
+;routine to set the astrometry info for the image
+  
+  ptr_free, self.catalog
+  ptr_free, self.catalog_type
+  self.catalog = ptr_new(new_catalog)
+  self.catalog_type = ptr_new(type)
 end
 
 ;----------------------------------------------------------------------
@@ -3131,7 +3188,7 @@ pro phast_startup
   
   state.colorbar_widget_id = widget_draw(state.colorbar_base_id, $
                                          uvalue = 'colorbar', $
-                                         xsize=245,/align_center,$
+                                         xsize=243,/align_left,$
                                          scr_ysize = state.colorbar_height)
   
   ; Create the widgets on screen

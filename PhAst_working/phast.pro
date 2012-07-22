@@ -166,7 +166,7 @@ pro phast_initcommon
     phot_rad_plot_open: 1, $
     kernel_list: '', $      ;path to file with kernel list
     spice_box_id: 0L, $     ;widget id for spice control box
-    check_updates: 0, $     ;check for updates on startup? 1=yes
+    check_updates: 1, $     ;check for updates on startup? 1=yes
     filter_color: 'Blue', $ ;which filter for catalog photometry?
     image_type: 'FITS',  $  ;what kind of image is being viewed?
     bias_filename: 'No bias loaded',$;name of bias file
@@ -249,7 +249,7 @@ pro phast_initcommon
     sex_cat_widget_id: 0L, $;widget id for the catalog input box
     sex_PHOT_AUTOPARAMS: [2.5, 0.0], $ ; kron radius controls for ZEROPOINT determination
     num_images: 0, $        ;number of images in image archive
-    version: '1.2', $       ; version # of this release
+    version: '1.3', $       ; version # of this release
     head_ptr: ptr_new(), $  ; pointer to image header
     astr_ptr: ptr_new(), $  ; pointer to astrometry info structure
     firstimage: 1, $        ; is this the first image?
