@@ -2739,7 +2739,7 @@ pro phast_refresh, fast = fast
   erase
   tv, pan_image, state.pan_offset[0], state.pan_offset[1]
   if ptr_valid(state.astr_ptr) then begin
-    arrows,image_archive[state.current_image_index]->get_header(),60,60
+    arrows,image_archive[state.current_image_index]->get_header(/string),60,60
   endif
   phast_resetwindow
   
@@ -2747,7 +2747,7 @@ pro phast_refresh, fast = fast
   if (not(keyword_set(fast))) then erase
   tv, pan_image, state.pan_offset[0], state.pan_offset[1]
   if ptr_valid(state.astr_ptr) then begin    ;stop
-    arrows,image_archive[state.current_image_index]->get_header(),60,60
+    arrows,image_archive[state.current_image_index]->get_header(/string),60,60
   endif
   
   phast_resetwindow
@@ -2927,21 +2927,21 @@ pro phast_rotate, rchange, get_angle=get_angle
         image_archive[state.current_image_index]->set_rotation,90.0,/add
         ;update current image and header
         main_image = image_archive[state.current_image_index]->get_image()
-        phast_setheader, image_archive[state.current_image_index]->get_header()
+        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
       end
       '180': begin
         ;update rotation state in image object
         image_archive[state.current_image_index]->set_rotation,180.0,/add
         ;update current image and header
         main_image = image_archive[state.current_image_index]->get_image()
-        phast_setheader, image_archive[state.current_image_index]->get_header()
+        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
       end
       '270': begin
         ;update rotation state in image object
         image_archive[state.current_image_index]->set_rotation,270.0,/add
         ;update current image and header
         main_image = image_archive[state.current_image_index]->get_image()
-        phast_setheader, image_archive[state.current_image_index]->get_header()
+        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
       end
     endcase
     
@@ -2960,14 +2960,14 @@ pro phast_rotate, rchange, get_angle=get_angle
       endfor
       ;update current image and header
       main_image = image_archive[state.current_image_index]->get_image()
-      phast_setheader,image_archive[state.current_image_index]->get_header()
+      phast_setheader,image_archive[state.current_image_index]->get_header(/string)
     endelse
   endelse
   
   ;Update header information after rotation if header is present
   if ptr_valid(state.head_ptr) then begin
     ; head = *(state.head_ptr)
-    phast_setheader, image_archive[state.current_image_index]->get_header()
+    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
   endif
   
   phast_getstats, /align, /noerase

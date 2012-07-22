@@ -5,6 +5,7 @@ pro phast_apphot
   ; aperture photometry front end
 
   common phast_state
+  common phast_images
   common phast_filters
   
   offset = [0,0]
@@ -14,32 +15,33 @@ pro phast_apphot
   
   ;update the exposure length and zero-point from image header
   if state.num_images gt 0 and state.image_type eq 'FITS' then begin
-    head = headfits(state.imagename)
-    state.exptime   = sxpar(head,'EXPTIME')
-    state.posFilter = sxpar(head,filters.fitsKey)
-    state.photzpt   = sxpar(head,'MAGZERO',count=count)
-    state.photzerr  = sxpar(head,'MAGZERR')
-    state.photzbnd  = sxpar(head,'MAGZBND')
-    state.photzclr  = sxpar(head,'MAGZCLR')
-    state.photztrm  = sxpar(head,'MAGZTRM')
-    state.photznum  = sxpar(head,'MAGZNUM')
-    ; zeropoint pre-determined by user; or instrumental if no zeropoint
-    if filters.doZeroPt[state.posFilter] EQ 0 then begin
-      state.photzpt  = filters.Zeropoint[state.posFilter]
-      state.photzerr = filters.errZeroPt[state.posFilter]
-      state.photzbnd = filters.nameFilter[state.posFilter]
-      state.photzclr =  0.0
-      state.photztrm =  '   '
-      state.photznum =  0
-    endif
-    if count EQ 0 then begin
-      state.photzpt  = 0.0
-      state.photzerr = 0.0
-      state.photzbnd = 'Instr'
-      state.photzclr =  0.0
-      state.photztrm =  '   '
-      state.photznum =  0
-    endif
+    ;head = headfits(state.imagename)
+     head = image_archive[state.current_image_index]->get_header(/string)
+     state.exptime   = sxpar(head,'EXPTIME')
+     state.posFilter = sxpar(head,filters.fitsKey)
+     state.photzpt   = sxpar(head,'MAGZERO',count=count)
+     state.photzerr  = sxpar(head,'MAGZERR')
+     state.photzbnd  = sxpar(head,'MAGZBND')
+     state.photzclr  = sxpar(head,'MAGZCLR')
+     state.photztrm  = sxpar(head,'MAGZTRM')
+     state.photznum  = sxpar(head,'MAGZNUM')
+     ; zeropoint pre-determined by user; or instrumental if no zeropoint
+     if filters.doZeroPt[state.posFilter] EQ 0 then begin
+        state.photzpt  = filters.Zeropoint[state.posFilter]
+        state.photzerr = filters.errZeroPt[state.posFilter]
+        state.photzbnd = filters.nameFilter[state.posFilter]
+        state.photzclr =  0.0
+        state.photztrm =  '   '
+        state.photznum =  0
+     endif
+     if count EQ 0 then begin
+        state.photzpt  = 0.0
+        state.photzerr = 0.0
+        state.photzbnd = 'Instr'
+        state.photzclr =  0.0
+        state.photztrm =  '   '
+        state.photznum =  0
+     endif
   endif
   
   if strlowcase(state.photzbnd) EQ 'instr' and state.magtype GT 0 then begin

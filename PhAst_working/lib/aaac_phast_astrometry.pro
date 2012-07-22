@@ -99,7 +99,7 @@ function phast_get_image_offset, index = index, ref_index = ref,round=round
   if not keyword_set(index) then index = state.current_image_index
   if not keyword_set(ref_index) then ref = 0
   if state.num_images gt 0 then begin
-     xyxy,image_archive[index]->get_header(),image_archive[ref]->get_header(),0,0,x,y
+     xyxy,image_archive[index]->get_header(/string),image_archive[ref]->get_header(/string),0,0,x,y
      offset = [x,y]
      if keyword_set(round) then offset = round(offset)
      return, offset

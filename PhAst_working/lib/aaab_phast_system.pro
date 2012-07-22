@@ -1,6 +1,6 @@
 ;-------------------------------------------------------------------
 
-pro phastslicer_event, event
+pro phas_slicer_event, event
 
   ; event handler for data cube slice selector widgets
 
@@ -190,7 +190,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
            image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
            image_archive[state.num_images-1]->set_image, new_image
            image_archive[state.num_images-1]->set_name, filename
-           image_archive[state.num_images-1]->set_header, head
+           image_archive[state.num_images-1]->set_header, head, /string
            image_archive[state.num_images-1]->set_rotation,0.0
            phast_setheader,head
            newimage = 1
@@ -200,7 +200,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
            image_archive[0] = obj_new('phast_image') ;create new image object
            image_archive[0]->set_image, new_image
            image_archive[0]->set_name, filename
-           image_archive[0]->set_header, head
+           image_archive[0]->set_header, head, /string
            image_archive[0]->set_rotation,0.0
            newimage = 1
         endelse
@@ -211,7 +211,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
               image_archive[state.num_images] = obj_new('phast_image') ;create new image object
               image_archive[state.num_images]->set_image, new_image
               image_archive[state.num_images]->set_name, filename
-              image_archive[state.num_images]->set_header, head
+              image_archive[state.num_images]->set_header, head, /string
               image_archive[state.num_images]->set_rotation,0.0
               state.num_images++
               newimage = 1
@@ -228,7 +228,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
            image_archive[state.num_images] = obj_new('phast_image') ;create new image object
            image_archive[state.num_images]->set_image, new_image
            image_archive[state.num_images]->set_name, filename
-           image_archive[state.num_images]->set_header, head
+           image_archive[state.num_images]->set_header, head, /string
            image_archive[state.num_images]->set_rotation,0.0
            state.num_images++
         endelse
@@ -238,7 +238,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   endif else begin              ;handle image refresh
      image_archive[refresh]->set_image, new_image
      image_archive[refresh]->set_name, filename
-     image_archive[refresh]->set_header, head
+     image_archive[refresh]->set_header, head, /string
      image_archive[refresh]->set_rotation,0.0
      newimage = 1
   endelse
@@ -385,7 +385,7 @@ pro phast_cycle_images, direction,animate=animate
     
     main_image = image_archive[state.current_image_index]->get_image()
     state.imagename  = image_archive[state.current_image_index]->get_name()
-    phast_setheader, image_archive[state.current_image_index]->get_header()
+    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
     counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
     temp = strsplit(image_archive[state.current_image_index]->get_name(),'/\',count=count,/extract)
     state.sex_catalog_path = ""
@@ -1337,7 +1337,7 @@ pro phast_image_switch, index
     state.current_image_index = index
     main_image = image_archive[state.current_image_index]->get_image()
     state.imagename  = image_archive[state.current_image_index]->get_name()
-    phast_setheader, image_archive[state.current_image_index]->get_header()
+    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
     counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
     ;update widgets
     widget_control,state.image_counter_id,set_value= counter_string
@@ -1355,7 +1355,8 @@ pro phast_image__define
   
   struct = {phast_image,$
             image: ptr_new(),$  ;array which holds the image data
-            header:ptr_new(),$  ;holds the image header
+            header_string: ptr_new(),$  ;holds the image header in string format
+            header_struct: ptr_new(), $ ;holds the image header as a structure
             name:ptr_new(),$    ;holds the file path to the image
             size:ptr_new(),$    ;contains the size of the image: [x,y]
             astr:ptr_new(),$    ;holds astrometry data, if available
@@ -1381,7 +1382,8 @@ pro phast_image::Cleanup
 ;Routine called by IDL destructor to free memory claimed by object
   
   ptr_free,self.image
-  ptr_free,self.header
+  ptr_free,self.header_string
+  ptr_free,self.header_struct
   ptr_free,self.name
   ptr_free,self.size
   ptr_free,self.rotation
@@ -1399,11 +1401,13 @@ end
 
 ;----------------------------------------------------------------------
  
-function phast_image::get_header
+function phast_image::get_header, struct=struct, string=string
   
 ;routine to get header from image object
   
-  return, *(self.header)
+  if keyword_set(struct) then return, *(self.header_struct)
+  if keyword_set(string) then return, *(self.header_string)
+  print, 'Error: Header not returned: no type specified'
 end
 
  ;----------------------------------------------------------------------
@@ -1452,7 +1456,8 @@ function phast_image::init
 ;constructor for image class
   
   self.image = ptr_new(/allocate)
-  self.header = ptr_new(/allocate)
+  self.header_string = ptr_new(/allocate)
+  self.header_struct = ptr_new(/allocate)
   self.name = ptr_new(/allocate)
   self.size = ptr_new(/allocate)
   self.rotation = ptr_new(/allocate)
@@ -1471,11 +1476,22 @@ end
 
 ;----------------------------------------------------------------------
  
-pro phast_image::set_header, header
+pro phast_image::set_header, header, struct=struct, string=string
   
 ;routine to set header of image object
-  
-  *(self.header) = header
+
+  while 1 eq 1 do begin ;choose obly one
+     if keyword_set(struct) then begin
+        *(self.header_struct) = header
+        break
+     endif
+     if keyword_set(string) then begin
+        *(self.header_string) = header
+        break
+     endif
+     print, 'Error: Header not set: no type specified'
+     break
+  endwhile
 end
 
 ;----------------------------------------------------------------------
@@ -3189,7 +3205,7 @@ pro phast_startup
   endif  
 end
 
- ;--------------------------------------------------------------------
+;--------------------------------------------------------------------
 
 pro phast_topmenu_event, event
       
