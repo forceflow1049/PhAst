@@ -186,7 +186,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
      if not keyword_set(dir_add) then begin
         if state.num_images gt 0 then begin ;check not first image
            state.num_images++
-           if state.num_images gt state.archive_chunk_count*state.archive_chunk_size then phast_expand_archive
+           if state.num_images gt state.archive_size then phast_expand_archive
            image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
            image_archive[state.num_images-1]->set_image, new_image
            image_archive[state.num_images-1]->set_name, filename
