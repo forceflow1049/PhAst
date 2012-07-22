@@ -2395,7 +2395,6 @@ pro phast_remove_image,index=index,all=all
            endif
         endwhile
      endif else begin
-        image_archive = 0.0
         state.num_images = 0
         state.current_image_index = 0
         state.catalog_loaded = 0
@@ -2406,7 +2405,6 @@ pro phast_remove_image,index=index,all=all
      endelse
   endif else begin
      for i=0,state.num_images-1 do obj_destroy,image_archive[i]
-     image_archive = 0.0
      state.num_images = 0
      state.current_image_index = 0
      state.catalog_loaded = 0
