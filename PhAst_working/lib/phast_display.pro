@@ -2907,7 +2907,7 @@ pro phast_rotate, rchange, get_angle=get_angle
   
   common phast_state
   common phast_images
- 
+  
   if state.num_images gt 0 then begin
      widget_control, /hourglass
      all = 0
@@ -2937,12 +2937,27 @@ pro phast_rotate, rchange, get_angle=get_angle
                                 ;update rotation state in image object
               image_archive[state.current_image_index]->set_rotation,90.0,/add
                                 ;update current image and header
+              if image_archive[state.current_image_index]->astr_valid() then begin
+                  hrotate, image_archive[state.current_image_index]->get_image(), image_archive[state.current_image_index]->get_header(/string), temp_image, temp_header, 1
+                  image_archive[state.current_image_index]->set_image, temp_image
+                  image_archive[state.current_image_index]->set_header, temp_header, /string
+
+              endif else image_archive[state.current_image_index]->set_image, rotate(image_archive[state.current_image_index]->get_image(),1)
+              
               main_image = image_archive[state.current_image_index]->get_image()
               phast_setheader, image_archive[state.current_image_index]->get_header(/string)
            end
            '180': begin
                                 ;update rotation state in image object
               image_archive[state.current_image_index]->set_rotation,180.0,/add
+
+              if image_archive[state.current_image_index]->astr_valid() then begin
+                 hrotate, image_archive[state.current_image_index]->get_image(), image_archive[state.current_image_index]->get_header(/string), temp_image, temp_header, 2
+                 image_archive[state.current_image_index]->set_image, temp_image
+                 image_archive[state.current_image_index]->set_header, temp_header, /string
+
+              endif else image_archive[state.current_image_index]->set_image, rotate(image_archive[state.current_image_index]->get_image(),2)
+
                                 ;update current image and header
               main_image = image_archive[state.current_image_index]->get_image()
               phast_setheader, image_archive[state.current_image_index]->get_header(/string)
@@ -2950,6 +2965,14 @@ pro phast_rotate, rchange, get_angle=get_angle
            '270': begin
                                 ;update rotation state in image object
               image_archive[state.current_image_index]->set_rotation,270.0,/add
+
+              if image_archive[state.current_image_index]->astr_valid() then begin
+                 hrotate, image_archive[state.current_image_index]->get_image(), image_archive[state.current_image_index]->get_header(/string), temp_image, temp_header, 3
+                 image_archive[state.current_image_index]->set_image, temp_image
+                 image_archive[state.current_image_index]->set_header, temp_header, /string
+
+              endif else image_archive[state.current_image_index]->set_image, rotate(image_archive[state.current_image_index]->get_image(),3)
+
                                 ;update current image and header
               main_image = image_archive[state.current_image_index]->get_image()
               phast_setheader, image_archive[state.current_image_index]->get_header(/string)
@@ -2957,6 +2980,14 @@ pro phast_rotate, rchange, get_angle=get_angle
         endcase
         
      endif else begin
+        
+                                ;###################################
+                                ;NOTE: This is currently disabled
+                                ;because arbitray rotation clips the
+                                ;image
+                                ;###################################
+
+
                                 ; arbitrary rotation angle
         rchange = float(rchange)
         if all eq 0 then begin  ;rotate current only
@@ -2970,25 +3001,24 @@ pro phast_rotate, rchange, get_angle=get_angle
               image_archive[i]->set_rotation,rchange,/add
            endfor
                                 ;update current image and header
-      main_image = image_archive[state.current_image_index]->get_image()
-      phast_setheader,image_archive[state.current_image_index]->get_header(/string)
-   endelse
+           main_image = image_archive[state.current_image_index]->get_image()
+           phast_setheader,image_archive[state.current_image_index]->get_header(/string)
+        endelse
      endelse
-  
+  endif else print, 'Error: no image to rotate!'
                                 ;Update header information after rotation if header is present
-     if ptr_valid(state.head_ptr) then begin
-                                ; head = *(state.head_ptr)
-        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-     endif
-     
-     phast_getstats, /align, /noerase
+     ;; if ptr_valid(state.head_ptr) then begin
+     ;;                            ; head = *(state.head_ptr)
+     ;;    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+     ;; endif
+  phast_getstats, /align, /noerase
      
                                 ;Redisplay image with current zoom, update pan, and refresh image
-     phast_displayall
+  phast_displayall
      
                                 ;make sure that the image arrays are updated for line/column plots, etc.
-     phast_resetwindow
-  endif else print, 'Error: no image to rotate!'
+  phast_resetwindow
+
 end
 
 ;--------------------------------------------------------------------
@@ -3084,7 +3114,6 @@ pro phast_scaleimage
   ;widget_control, /hourglass
   
   scaled_image=0
-  
   case state.scaling of
     0: scaled_image = $                 ; linear stretch
       bytscl(main_image, $

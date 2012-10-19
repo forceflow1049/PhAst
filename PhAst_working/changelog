@@ -3,3 +3,4 @@
 -new chunking behavior for expanding image_archive [Morgan Rehnberg]
 -fixed bugs in image calibration [Morgan Rehnberg]
 -added keyboard shortcuts for switching images (Page Up/Down, Home/End) [Morgan Rehnberg]
+-restricted rotation to 90,180,270, but fixed rotation of rectangular images [Morgan Rehnberg]

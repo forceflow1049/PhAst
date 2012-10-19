@@ -732,7 +732,7 @@ pro phast_draw_keyboard_event, event
         9: phast_cycle_images,1 ;Page Up
         10: phast_cycle_images, -1 ;Page Down
         11: phast_image_switch, 0 ;Home
-        12: phast_image_switch, state.num_images-1 ;End
+        12: phast_image_switch, state.num_images-1 ;end
         else:
      endcase
   endif 
@@ -1587,9 +1587,6 @@ pro phast_image::set_rotation,deg,add=add
   endif else begin
      *(self.rotation) = (*(self.rotation) + deg) mod 360
   endelse
-  if self.astr_valid() then begin
-     hrot, *self.image, *self.header, -1, -1, deg, -1, -1, 2
-  endif else *self.image = rot(*self.image,deg)
 end
 
 ;-----------------------------------------------------------------------------------------
@@ -2906,7 +2903,7 @@ pro phast_startup
                   {cw_pdmenu_s, 0, '--------------'}, $
                   {cw_pdmenu_s, 2, 'MakeRGB'}, $
                   {cw_pdmenu_s, 1, 'Rotate/Zoom'}, $
-                  {cw_pdmenu_s, 0, 'Rotate'}, $
+                 ; {cw_pdmenu_s, 0, 'Rotate'}, $
                   {cw_pdmenu_s, 0, '90 deg'}, $
                   {cw_pdmenu_s, 0, '180 deg'}, $
                   {cw_pdmenu_s, 0, '270 deg'}, $
