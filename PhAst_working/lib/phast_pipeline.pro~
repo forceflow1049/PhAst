@@ -35,7 +35,7 @@ pro phast_batch
     dir_toggle = widget_button(image_toggles,value='Directory',uvalue='dir_toggle')
     dirname_base = widget_base(image_base,/row)
     state.batch_select_dir = widget_button(dirname_base,value='Select directory',uvalue='select_dir',sensitive=0)
-    state.batch_dir_id = widget_label(dirname_base,value=' No directory selected',/dynamic_resize)
+    state.batch_dir_id = widget_label(dirname_base,value=' No directory loaded',/dynamic_resize)
     
     ;calibrate base
     cal_select_box = widget_base(calibrate_base,/row)
@@ -43,20 +43,20 @@ pro phast_batch
     over_correct = widget_button(overscan_base,value='Overscan correction',uvalue='over_correct')
     button_box1 = widget_base(cal_select_box,/nonexclusive,/column)
     bias_toggle = widget_button(button_box1,value='Bias',uvalue='bias_toggle')
-    flat_toggle = widget_button(button_box1,value='Flat',uvalue='flat_toggle')
     dark_toggle = widget_button(button_box1,value='Dark',uvalue='dark_toggle')
+    flat_toggle = widget_button(button_box1,value='Flat',uvalue='flat_toggle')
     button_box2 = widget_base(cal_select_box,/column)
     state.bias_select_id = widget_button(button_box2,value='Select a bias',uvalue='bias_select',sensitive=0)
-    state.flat_select_id = widget_button(button_box2,value='Select a flat',uvalue='flat_select',sensitive=0)
     state.dark_select_id = widget_button(button_box2,value='Select a dark',uvalue='dark_select',sensitive=0)
+    state.flat_select_id = widget_button(button_box2,value='Select a flat',uvalue='flat_select',sensitive=0)
     label_box1 = widget_base(cal_select_box,/column)
     spacer_1 = widget_label(label_box1,value='')
     state.bias_label_id = widget_label(label_box1,value=state.bias_filename, /align_left, /dynamic_resize)
     spacer_2  = widget_label(label_box1,value='')
-    state.flat_label_id = widget_label(label_box1,value=state.flat_filename, /align_left, /dynamic_resize)
-    spacer_3 = widget_label(label_box1,value='')
     state.dark_label_id = widget_label(label_box1,value=state.dark_filename, /align_left, /dynamic_resize)
-
+    spacer_3 = widget_label(label_box1,value='')
+    state.flat_label_id = widget_label(label_box1,value=state.flat_filename, /align_left, /dynamic_resize)
+    
     ;SExtractor base
     sex_flags_label = widget_label(sextractor_base,value='Flags:')
     state.sex_flags_widget_id = widget_text(sextractor_base,value=state.sex_flags,uvalue='sex_flags',xsize=50,/all_events,/editable)
@@ -548,7 +548,7 @@ pro phast_calibrate
   
   ;correct overscan
   error = 0
-  ;catch,error
+  catch,error
   if error ne 0 then result = dialog_message('Error encountered.  No overscan region present?',/error,/center)
   if state.over_toggle ne 0 and error eq 0 then begin
   
@@ -557,14 +557,13 @@ pro phast_calibrate
     split = strsplit(overscan,'[,:]',/extract)
     region = fix(split)-1
     region[0] = region[0]-1
-
     ;remove overscan from each image
-    for i=0,region[3] do begin ;cycle columns
+    for i=0,region[0] do begin
       med_main = median(main[region[0]+1:region[1],i])
       main[*,i] = main[*,i]-med_main
       if state.dark_toggle ne 0 then begin
         med_dark = median(dark[region[0]+1:region[1],i])
-        dark[*,i] = dark[*,i]-med_dark 
+        dark[*,i] = dark[*,i]-med_dark
       endif
       if state.flat_toggle ne 0 then begin
         med_flat = median(flat[region[0]+1:region[1],i])
@@ -577,9 +576,6 @@ pro phast_calibrate
     endfor
     ;  print,bias[50:60,50:60]
     ;trim overscan region from each image
-
-    help, region, main
-  
     main = main(0 : region[0],region[2] : region[3])
     if state.dark_toggle ne 0 then dark = dark(0 : region[0],region[2] : region[3])
     if state.flat_toggle ne 0 then flat = flat(0 : region[0],region[2] : region[3])
@@ -589,10 +585,7 @@ pro phast_calibrate
   endif
   ;subtract bias
   if state.bias_toggle ne 0 then begin
-
-     help, main, bias
-
-    main = (main-bias)>0
+    main = main-bias
   endif
   
   ;subtract dark
@@ -659,7 +652,7 @@ pro phast_calibrate
   sxaddpar,cal_science_head,'EPOCH',2000.0
   sxdelpar,cal_science_head,'' ;trim whitespace entries
   sxaddpar,cal_science_header, 'END',''
-
+  print, 'here3'
   fits_write,state.cal_file_name,main,cal_science_head
 end
 
@@ -689,21 +682,21 @@ pro phast_calibrate_image
     cal_select_label = widget_label(left_box,value='Select calibration images:')
     cal_select_box = widget_base(left_box,/row)
     button_box1 = widget_base(cal_select_box,/nonexclusive,/column)
-    bias_toggle = widget_button(button_box1,value='Bias',uvalue='bias_toggle')
-    flat_toggle = widget_button(button_box1,value='Flat',uvalue='flat_toggle')
     dark_toggle = widget_button(button_box1,value='Dark',uvalue='dark_toggle')
+    flat_toggle = widget_button(button_box1,value='Flat',uvalue='flat_toggle')
+    bias_toggle = widget_button(button_box1,value='Bias',uvalue='bias_toggle')
     button_box2 = widget_base(cal_select_box,/column)
-    state.bias_select_id = widget_button(button_box2,value='Select a bias',uvalue='bias_select',sensitive=0)
-    state.flat_select_id = widget_button(button_box2,value='Select a flat',uvalue='flat_select',sensitive=0)
     state.dark_select_id = widget_button(button_box2,value='Select a dark',uvalue='dark_select',sensitive=0)
+    state.flat_select_id = widget_button(button_box2,value='Select a flat',uvalue='flat_select',sensitive=0)
+    state.bias_select_id = widget_button(button_box2,value='Select a bias',uvalue='bias_select',sensitive=0)
     label_box1 = widget_base(cal_select_box,/column)
     spacer_1  = widget_label(label_box1,value='')
-    state.bias_label_id = widget_label(label_box1,value=state.bias_filename,/dynamic_resize)
+    state.dark_label_id = widget_label(label_box1,value=state.dark_filename,/dynamic_resize)
     spacer_2 = widget_label(label_box1,value='')
     state.flat_label_id = widget_label(label_box1,value=state.flat_filename,/dynamic_resize)
     spacer_3 = widget_label(label_box1,value='')
-    state.dark_label_id = widget_label(label_box1,value=state.dark_filename,/dynamic_resize)
-
+    state.bias_label_id = widget_label(label_box1,value=state.bias_filename,/dynamic_resize)
+    
     ;right_box = widget_base(main_box,/column,frame=4)
     ;parem_label = widget_label(right_box,value='Parameters')
     
@@ -822,10 +815,8 @@ pro phast_calibrate_image_event,event
     end
     'calibrate': begin
       if n_elements(cal_science) gt 1 then begin
-         if state.cal_file_name ne '' then begin 
-            phast_calibrate
-            result = dialog_message('Calibration complete!',/center,/information)
-         endif else result = dialog_message('You must specify an output filename!',/center) ;warn if no filename specified
+        phast_calibrate
+        result = dialog_message('Calibration complete!',/center,/information)
       endif else begin ;warn if no science image is loaded
         result = dialog_message('Science image must be loaded!',/center)
       endelse

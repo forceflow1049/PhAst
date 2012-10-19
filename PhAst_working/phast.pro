@@ -181,7 +181,7 @@ pro phast_initcommon
     fits_cdelt1:0.0, $      ;holds x plate scale (deg)
     batch_dir_id: 0L, $     ;widget id for batch dir display
     apphot_wcs_id: 0L,$     ;widget id for wcs coords in apphot
-    cal_file_name: '',$     ;cal output file name
+    cal_file_name: './output/images/phast.fits',$;cal output file name
     cal_name_box_id: 0L, $  ;widget id for cal output box
     over_toggle: 0, $       ;correct images for overscan?
     sci_label_id: 0L, $     ;wodget id for science cal label

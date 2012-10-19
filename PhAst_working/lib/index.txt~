@@ -65,7 +65,6 @@ phast_system: contains common blocks and archives and basic routines
      phast_setheader
      phast_shutdown
      phast_startup
-     phast_stretch_image
      phast_topmenu_event
      phast_wfpc2_read
      phast_writefits

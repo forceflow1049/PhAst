@@ -1025,7 +1025,7 @@ pro phast_gettrack
 
   common phast_state
   common phast_images
-
+  
   ;get image offset
   offset = [0,0]
   if state.align_toggle eq 1 then offset = phast_get_image_offset()
@@ -2907,88 +2907,86 @@ pro phast_rotate, rchange, get_angle=get_angle
   
   common phast_state
   common phast_images
- 
-  if state.num_images gt 0 then begin
-     widget_control, /hourglass
-     all = 0
-     if (keyword_set(get_angle)) then begin
-        
-        formdesc = ['0, float,, label_left=Rotation Angle: ', $
-                    '1, base, , row', $
-                    '0, button, Cancel, quit', $
-                    '0, button, Rotate, quit', $
-                    '0, button, Rotate all, quit']
-        
-        textform = cw_form(formdesc, /column, title = 'Rotate')
-        
-        if (textform.tag2 EQ 1) then return
-        if (textform.tag3 EQ 1) then rchange = textform.tag0
-        if (textform.tag4 EQ 1) then begin
-           rchange = textform.tag0
-           all = 1
-        endif
-     endif
-     
-     if not keyword_set(get_angle)then begin
-        case rchange of
-           '0':                 ; do nothing
-           
-           '90': begin
-                                ;update rotation state in image object
-              image_archive[state.current_image_index]->set_rotation,90.0,/add
-                                ;update current image and header
-              main_image = image_archive[state.current_image_index]->get_image()
-              phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-           end
-           '180': begin
-                                ;update rotation state in image object
-              image_archive[state.current_image_index]->set_rotation,180.0,/add
-                                ;update current image and header
-              main_image = image_archive[state.current_image_index]->get_image()
-              phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-           end
-           '270': begin
-                                ;update rotation state in image object
-              image_archive[state.current_image_index]->set_rotation,270.0,/add
-                                ;update current image and header
-              main_image = image_archive[state.current_image_index]->get_image()
-              phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-           end
-        endcase
-        
-     endif else begin
-                                ; arbitrary rotation angle
-        rchange = float(rchange)
-        if all eq 0 then begin  ;rotate current only
-                                ;update rotation state in image object
-           image_archive[state.current_image_index]->set_rotation,rchange,/add
-                                ;update current image and header
-           main_image = image_archive[state.current_image_index]->get_image()
-           phast_setheader, image_archive[state.current_image_index]->get_header()
-        endif else begin
-           for i = 0, state.num_images-1 do begin
-              image_archive[i]->set_rotation,rchange,/add
-           endfor
-                                ;update current image and header
+
+  widget_control, /hourglass
+  all = 0
+  if (keyword_set(get_angle)) then begin
+  
+    formdesc = ['0, float,, label_left=Rotation Angle: ', $
+      '1, base, , row', $
+      '0, button, Cancel, quit', $
+      '0, button, Rotate, quit', $
+      '0, button, Rotate all, quit']
+      
+    textform = cw_form(formdesc, /column, title = 'Rotate')
+    
+    if (textform.tag2 EQ 1) then return
+    if (textform.tag3 EQ 1) then rchange = textform.tag0
+    if (textform.tag4 EQ 1) then begin
+      rchange = textform.tag0
+      all = 1
+    endif
+  endif
+  
+  if not keyword_set(get_angle)then begin
+    case rchange of
+      '0':                    ; do nothing
+      
+      '90': begin
+        ;update rotation state in image object
+        image_archive[state.current_image_index]->set_rotation,90.0,/add
+        ;update current image and header
+        main_image = image_archive[state.current_image_index]->get_image()
+        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+      end
+      '180': begin
+        ;update rotation state in image object
+        image_archive[state.current_image_index]->set_rotation,180.0,/add
+        ;update current image and header
+        main_image = image_archive[state.current_image_index]->get_image()
+        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+      end
+      '270': begin
+        ;update rotation state in image object
+        image_archive[state.current_image_index]->set_rotation,270.0,/add
+        ;update current image and header
+        main_image = image_archive[state.current_image_index]->get_image()
+        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+      end
+    endcase
+    
+  endif else begin
+    ; arbitrary rotation angle
+    rchange = float(rchange)
+    if all eq 0 then begin        ;rotate current only
+      ;update rotation state in image object
+      image_archive[state.current_image_index]->set_rotation,rchange,/add
+      ;update current image and header
+      main_image = image_archive[state.current_image_index]->get_image()
+      phast_setheader, image_archive[state.current_image_index]->get_header()
+    endif else begin
+      for i = 0, state.num_images-1 do begin
+        image_archive[i]->set_rotation,rchange,/add
+      endfor
+      ;update current image and header
       main_image = image_archive[state.current_image_index]->get_image()
       phast_setheader,image_archive[state.current_image_index]->get_header(/string)
-   endelse
-     endelse
+    endelse
+  endelse
   
-                                ;Update header information after rotation if header is present
-     if ptr_valid(state.head_ptr) then begin
-                                ; head = *(state.head_ptr)
-        phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-     endif
-     
-     phast_getstats, /align, /noerase
-     
-                                ;Redisplay image with current zoom, update pan, and refresh image
-     phast_displayall
-     
-                                ;make sure that the image arrays are updated for line/column plots, etc.
-     phast_resetwindow
-  endif else print, 'Error: no image to rotate!'
+  ;Update header information after rotation if header is present
+  if ptr_valid(state.head_ptr) then begin
+    ; head = *(state.head_ptr)
+    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+  endif
+  
+  phast_getstats, /align, /noerase
+  
+  ;Redisplay image with current zoom, update pan, and refresh image
+  phast_displayall
+  
+  ;make sure that the image arrays are updated for line/column plots, etc.
+  phast_resetwindow
 end
 
 ;--------------------------------------------------------------------

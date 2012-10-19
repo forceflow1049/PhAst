@@ -674,6 +674,7 @@ pro phast_draw_keyboard_event, event
      
      if (!d.name NE state.graphicsdevice and eventchar NE 'q') then return
      if (state.bitdepth EQ 24) then true = 1 else true = 0
+     
      case eventchar of
         '1': phast_move_cursor, eventchar
         '2': phast_move_cursor, eventchar
@@ -729,13 +730,9 @@ pro phast_draw_keyboard_event, event
         6: phast_move_cursor, '6'
         7: phast_move_cursor, '8'
         8: phast_move_cursor, '2'
-        9: phast_cycle_images,1 ;Page Up
-        10: phast_cycle_images, -1 ;Page Down
-        11: phast_image_switch, 0 ;Home
-        12: phast_image_switch, state.num_images-1 ;End
         else:
      endcase
-  endif 
+  endif
   
   if (xregistered('phast', /noshow)) then $
      widget_control, state.draw_widget_id, /sensitive ;, /input_focus
