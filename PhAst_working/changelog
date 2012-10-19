@@ -1,3 +1,5 @@
 -PhAst split into nine files, stored in lib direcotry [Morgan Rehnberg]
 -Fixed huge memory leak in image archive.  Memory should be totally conserved now [Morgan Rehnberg]
 -new chunking behavior for expanding image_archive [Morgan Rehnberg]
+-fixed bugs in image calibration [Morgan Rehnberg]
+-added keyboard shortcuts for switching images (Page Up/Down, Home/End) [Morgan Rehnberg]
