@@ -87,26 +87,6 @@ end
 
 ;----------------------------------------------------------------------
 
-function phast_get_image_offset, index = index, ref_index = ref,round=round
-  
-;function to return the x,y offset between an image and the reference
-;image
-  
-  common phast_images
-  common phast_state
-  
-  if not keyword_set(index) then index = state.current_image_index
-  if not keyword_set(ref_index) then ref = 0
-  if state.num_images gt 0 then begin
-     xyxy,image_archive[index]->get_header(/string),image_archive[ref]->get_header(/string),0,0,x,y
-     offset = [x,y]
-     if keyword_set(round) then offset = round(offset)
-     return, offset
-  endif else return, [0,0]
-end
-
-;----------------------------------------------------------------------
-
 pro phast_2mass_read, fitsfile, head, cancelled
 
   ; Fits reader for 3-plane 2MASS Extended Source J/H/Ks data cube.
@@ -1146,11 +1126,7 @@ pro phast_event, event
      ;align
      'align_toggle': begin
         if state.align_toggle eq 0 then begin
-           offset = state.zoom_factor*phast_get_image_offset()
-           if not finite(offset[0]) then begin
-              result = dialog_message('Error: Offset distance larger than image size. PhAst does not currently support aligning images which do not overlap.', /error,/center)
-              widget_control, state.align_toggle_button, set_button=0
-           endif else  state.align_toggle = 1
+           state.align_toggle = 1
         endif else state.align_toggle = 0
      end
      
@@ -3032,7 +3008,7 @@ pro phast_startup, phast_dir, launch_dir
   
   toggle_buttonbox = widget_base(image_switch_row1,/row,/nonexclusive)
   
-  state.align_toggle_button = widget_button(toggle_buttonbox,value='Align',uvalue='align_toggle',$
+  align_toggle = widget_button(toggle_buttonbox,value='Align',uvalue='align_toggle',$
                                tooltip='Align images using WCS coordinates')
   
   state.image_counter_id = cycle_image_label
@@ -3344,14 +3320,6 @@ pro phast_topmenu_event, event
                state.default_autoscale EQ 1) then phast_autoscale
            if (state.firstimage EQ 1) then phast_autoscale
            phast_set_minmax
-           if state.align_toggle eq 1 then begin
-              offset = phast_get_image_offset()
-              if not finite(offset[0]) then begin
-                 result = dialog_message('Image alignment disabled: PhAst does not currently support aligning images which do not overlap.', /error,/center)
-                 state.align_toggle = 0
-                 widget_control, state.align_toggle_button, set_button=0
-              endif
-           endif
            phast_displayall
            phast_settitle
            state.firstimage = 0

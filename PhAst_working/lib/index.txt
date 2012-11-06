@@ -10,6 +10,7 @@ phast_install: sets IDL path and checks for libraries
      
 phast_system: contains common blocks and archives and basic routines
      phastslicer_event
+     phast_get_image_offset
      phast_2mass_read
      phast_activate
      phast_add_image
@@ -159,7 +160,6 @@ phast_astrometry: handles image astrometry
      phast_getFieldEpoch
      phast_getoffset
      phast_getradec
-     phast_get_image_offset
      phast_get_stars
      phast_search_stars
      phast_wavestring

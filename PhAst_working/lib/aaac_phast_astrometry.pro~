@@ -88,6 +88,26 @@ end
 
 ;----------------------------------------------------------------------
 
+function phast_get_image_offset, index = index, ref_index = ref,round=round
+  
+;function to return the x,y offset between an image and the reference
+;image
+  
+  common phast_images
+  common phast_state
+  
+  if not keyword_set(index) then index = state.current_image_index
+  if not keyword_set(ref_index) then ref = 0
+  if state.num_images gt 0 then begin
+     xyxy,image_archive[index]->get_header(/string),image_archive[ref]->get_header(/string),0,0,x,y
+     offset = [x,y]
+     if keyword_set(round) then offset = round(offset)
+     return, offset
+  endif else return, [0,0]
+end
+
+;----------------------------------------------------------------------
+
 function phast_get_stars, a, d, radius, AsOf=AsOf, catalog_name=catalog_name
   
 ;routine to retrieve stars from an outside catalog and format into phast structure
