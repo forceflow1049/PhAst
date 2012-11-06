@@ -577,8 +577,6 @@ pro phast_calibrate
     endfor
     ;  print,bias[50:60,50:60]
     ;trim overscan region from each image
-
-    help, region, main
   
     main = main(0 : region[0],region[2] : region[3])
     if state.dark_toggle ne 0 then dark = dark(0 : region[0],region[2] : region[3])
@@ -589,10 +587,7 @@ pro phast_calibrate
   endif
   ;subtract bias
   if state.bias_toggle ne 0 then begin
-
-     help, main, bias
-
-    main = (main-bias)>0
+     main = (main-bias)>0
   endif
   
   ;subtract dark
@@ -611,7 +606,7 @@ pro phast_calibrate
   ;divide by flat
   if state.flat_toggle ne 0 then begin
     ;subtract bias from flat
-    flat = flat - bias
+    flat = (flat - bias)>1
     ;scale dark to match flat exposure time
     if state.dark_toggle ne 0 then begin
       dark = cal_dark
@@ -910,9 +905,11 @@ pro phast_do_missfits,image = image, flags = flags
   
   if not keyword_set(flags) then flags = ''
   if not keyword_set(image) then image = state.imagename
-  
+
+  cd, state.phast_dir
   widget_control,/hourglass
   spawn,'missfits ' + image + ' ' + flags
+  cd, state.launch_dir
 end
 
 ;----------------------------------------------------------------------
@@ -924,8 +921,10 @@ pro phast_do_scamp, cat_name = cat_name, flags = flags
   if not keyword_set(cat_name) then cat_name = state.scamp_catalog_name
   if not keyword_set(flags) then flags = ''
   
+  cd, state.phast_dir
   widget_control,/hourglass
   spawn, 'scamp ' + cat_name + flags
+  cd, state.launch_dir
 end
 
 ;----------------------------------------------------------------------
@@ -939,9 +938,11 @@ pro phast_do_sextractor,image = image, flags = flags, cat_name = cat_name
   if not keyword_set(flags) then flags = state.sex_flags
   if not keyword_set(cat_name) then cat_name = state.sex_catalog_name
   
+  cd, state.phast_dir
   widget_control,/hourglass
   textstr = 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
   spawn, 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
+  cd, state.launch_dir
 end
 
 ;----------------------------------------------------------------------

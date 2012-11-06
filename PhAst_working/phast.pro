@@ -44,7 +44,7 @@
 ;       phast_mpc_data: contains data for creating an MPC report
 ;
 ; RESTRICTIONS:
-;       Requires IDL version 6.0 or greater.
+;       Requires IDL version 8.0 or greater.
 ;       Requires Craig Markwardt's cmps_form.pro routine.
 ;       Requires the GSFC IDL astronomy user's library routines.
 ;       Some features may not work under all operating systems.
@@ -71,7 +71,7 @@
 
 ;----------------------------------------------------------------------
 
-pro phast_initcommon
+pro phast_initcommon, phast_dir, launch_dir
 
   ; Routine to initialize the phast common blocks.  Use common blocks so
   ; that other IDL programs can access the phast internal data easily.
@@ -161,6 +161,9 @@ pro phast_initcommon
     }
     
   state = {                $
+    filters_loaded: 0, $    ;are filter specifications loaded?
+    launch_dir: launch_dir, $;location where phast is being run 
+    phast_dir: phast_dir, $ ;location of phast.pro
     archive_size: 25, $     ;number of chunks created
     archive_chunk_size: 25,$;block size for incresing archive
     phot_rad_plot_open: 1, $
@@ -521,25 +524,26 @@ end
 
 ;--------------------------------------------------------------------
 
-pro phast_compile_modules
+pro phast_compile_modules, phast_location, launch_dir
 
   ;routine to compile other PhAst procdueres on startup
 
-cd, 'lib'
-
-filelist =findfile('*.pro')
-
-for j=0, 1 do begin ;need multiple compiles for some reason
-   for i=0, n_elements(filelist)-1 do begin
-      temp = strsplit(filelist[i],'.',/extract)
-      if (temp[0] eq 'cmps_form') or( temp[0] eq 'dialog_input') $
-         or (temp[0] eq 'read_vicar') or (temp[0] eq 'vicgetpars') then begin
-         resolve_routine, temp[0], /compile_full_file, /is_function
-      endif else resolve_routine, temp[0], /compile_full_file
-   endfor
-endfor
-
-cd, '../'
+  ;switch to PhAst's library directory
+  cd, phast_location+'lib'
+  
+  filelist =findfile('*.pro')
+  
+  for j=0, 1 do begin           ;need multiple compiles for some reason
+     for i=0, n_elements(filelist)-1 do begin
+        temp = strsplit(filelist[i],'.',/extract)
+        if (temp[0] eq 'cmps_form') or( temp[0] eq 'dialog_input') $
+           or (temp[0] eq 'read_vicar') or (temp[0] eq 'vicgetpars') then begin
+           resolve_routine, temp[0], /compile_full_file, /is_function
+        endif else resolve_routine, temp[0], /compile_full_file
+     endfor
+  endfor
+  
+  cd, launch_dir
 end
 
 ;--------------------------------------------------------------------
@@ -572,9 +576,14 @@ pro phast, image, $
   endif
   
   if (not(keyword_set(block))) then block = 0 else block = 1
-  
-  ;compile program
-  phast_compile_modules
+
+;find directory where PhAst is located and the current dir
+  cd, current=launch_dir
+  findpro, 'phast.pro', dirlist=list, /noprint
+  phast_dir = list[0]
+
+  ;compile program 
+  phast_compile_modules, phast_dir, launch_dir
 
   newimage = 0
   
@@ -599,7 +608,7 @@ pro phast, image, $
   ; this routine.
   if (not (xregistered('phast', /noshow))) then begin
     userwindow = !d.window
-    phast_startup
+    phast_startup, phast_dir, launch_dir
     align = 0B     ; align, stretch keywords make no sense if we are
     stretch = 0B   ; just starting up.
     
@@ -610,8 +619,7 @@ pro phast, image, $
   ;   print
     
   endif
-  
-  
+
   if (n_elements(align) EQ 0) then align = state.default_align
   if (n_elements(stretch) EQ 0) then stretch = state.default_stretch
   

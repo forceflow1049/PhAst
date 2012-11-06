@@ -1,12 +1,8 @@
 Index of PhAst
 
 phast: iniializes the other componants
-     phast_compile_modules
      phast_initcommon
      phast
-
-phast_install: sets IDL path and checks for libraries
-     phast_install
      
 phast_system: contains common blocks and archives and basic routines
      phastslicer_event
@@ -16,7 +12,6 @@ phast_system: contains common blocks and archives and basic routines
      phast_changemode
      phast_check_updates
      phast_cycle_images
-     phast_debug_info
      phast_drawpath
      phast_drawvector
      phast_draw_blink_event
@@ -70,7 +65,6 @@ phast_system: contains common blocks and archives and basic routines
      phast_setheader
      phast_shutdown
      phast_startup
-     phast_stretch_image
      phast_topmenu_event
      phast_wfpc2_read
      phast_writefits

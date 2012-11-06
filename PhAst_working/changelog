@@ -4,3 +4,5 @@
 -fixed bugs in image calibration [Morgan Rehnberg]
 -added keyboard shortcuts for switching images (Page Up/Down, Home/End) [Morgan Rehnberg]
 -restricted rotation to 90,180,270, but fixed rotation of rectangular images [Morgan Rehnberg]
+-tweaked opening behavior of photometry window [Morgan Rehnberg]
+-Fixed bug with remvoving images [Morgan Rehnberg]

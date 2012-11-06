@@ -51,181 +51,181 @@ pro phast_apphot
   endif
   
   if (not (xregistered('phast_apphot', /noshow))) then begin
-  
-    apphot_base = $
-      widget_base(/base_align_center, $
-      group_leader = state.base_id, $
-      /column,xoffset=state.draw_window_size[0]+300, $
-      title = 'phast aperture photometry', $
-      uvalue = 'apphot_base')
-      
-    apphot_row_1     = widget_base(apphot_base,/row,/base_align_center)
-    apphot_insert1   = widget_base(apphot_base,/row,/base_align_center)
-    apphot_insert2   = widget_base(apphot_base,/row,/base_align_center)
-    apphot_row_2     = widget_base(apphot_base,/row,/base_align_center)
-    apphot_draw_base = widget_base(apphot_base,/row,/base_align_center, frame=0)
-    
-    apphot_data_base1a  = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_left)
-    apphot_plot_base    = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_center)
-    
-    apphot_data_insert1 = widget_base(apphot_insert1,/row,   frame=4,xsize=492,ysize= 50, /base_align_center)
-    apphot_data_insert2 = widget_base(apphot_insert2,/row,   frame=4,xsize=492,ysize= 50, /base_align_center)
-    
-    apphot_data_base1   = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130, /base_align_center)
-    apphot_data_base2   = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130 ,/base_align_center)
-    
-    ; populate apphot_data_base1a
-    tmp_string1 = string(99999.0, 99999.0, format = '("Object position: (",f7.1,", ",f7.1,")")')
-    state.centerpos_id  = widget_label(apphot_data_base1a, value = tmp_string1, uvalue = 'centerpos', /align_center)
-    
-    state.apphot_wcs_id = widget_label(apphot_data_base1a, value='--- No WCS Info ---', /align_center, /dynamic_resize)
-    
-    state.centerbox_id = $
-      cw_field(apphot_data_base1a, $
-      /long, $
-      /return_events, $
-      title = 'Centering box size (pix):', $
-      uvalue = 'centerbox', $
-      value = state.centerboxsize, $
-      xsize = 7)
-      
-    state.radius_id = $
-      cw_field(apphot_data_base1a, $
-      /floating, $
-      /return_events, $
-      title = '   Aperture radius (pix):', $
-      uvalue = 'radius', $
-      value = state.aprad, $
-      xsize = 7)
-      
-    state.innersky_id = $
-      cw_field(apphot_data_base1a, $
-      /floating, $
-      /return_events, $
-      title = '  Inner sky radius (pix):', $
-      uvalue = 'innersky', $
-      value = state.innersky, $
-      xsize = 7)
-      
-    state.outersky_id = $
-      cw_field(apphot_data_base1a, $
-      /floating, $
-      /return_events, $
-      title = '  Outer sky radius (pix):', $
-      uvalue = 'outersky', $
-      value = state.outersky, $
-      xsize = 7)
-      
-    ; populate apphot_data_insert1
-    if state.magunits EQ 1 then state.phot_aperFWHM = round(100*state.objFWHM)/100.0                       $
-    else state.phot_aperFWHM = round(100*state.objFWHM * state.pixelscale)/100.0
-    
-    state.phot_aperFWHM_ID  = cw_field(apphot_data_insert1, /floating, /return_events, uvalue = 'aperFWHM', $
-      value = state.phot_aperFWHM, title='Apertures:   FWHM', xsize = 4, /row)
-      
-    state.phot_aperUnit_ID  = cw_field(apphot_data_insert1, /string, uvalue = 'aperUnit', $
-      value = state.phot_aperList[state.magunits], title='', xsize = 2, /row)
-      
-      
-    state.phot_aperTrain_ID = widget_button(apphot_data_insert1, value = 'Train', uvalue = 'aperTrain', xsize=50)
-    
-    state.phot_aperType_ID  = cw_bgroup(apphot_data_insert1, ['Snap To', 'Centroid', 'Manual'], uvalue = 'aperType', $
-      button_uvalue = [0, 1, 2], set_value = 0, label_left = '', $
-      /exclusive, /no_release, /row)
-      
-    ; populate apphot_data_insert2
-    photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
-    if count eq 0 then begin
-      state.photSpecType = 'K'
-      photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
-    endif
-    state.photSpecTypeNum = (0 > photSpecTypeNum[0]) < 9
-    state.photSpec_Type_ID = cw_bgroup(apphot_data_insert2, state.photSpecList, uvalue = 'spectralLtr',  $
-      button_uvalue = state.photSpecList,                              $
-      /exclusive, set_value = state.photSpecTypeNum,                   $
-      /no_release,                                                     $
-      /row)
-      
-    state.photSpecSubNum = (0 > state.photSpecSubNum) < 9
-    state.photSpec_Num_ID  = cw_field(apphot_data_insert2, /long, /return_events, uvalue = 'spectralNum', $
-      value = state.photSpecSubNum, title='', xsize = 1, /row)
-      
-    colors = phast_intrinsic_colors(state.photSpecTypeNum, state.photSpecSubNum)
-    state.photSpecBmV = colors[0]
-    state.photSpecVmR = colors[1]
-    state.photSpecRmI = colors[2]
-    
-    state.photSpec_BmV_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralBmV', $
-      value = state.photSpecBmV, title='B-V', xsize = 4, /row)
-      
-    state.photSpec_VmR_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralVmR', $
-      value = state.photSpecVmR, title='V-R', xsize = 4, /row)
-      
-    state.photSpec_RmI_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralRmI', $
-      value = state.photSpecRmI, title='R-I', xsize = 4, /row)
-      
-      
-    ; populate apphot_data_base1
-    apphot_cycle_base = widget_base(apphot_data_base1,/row)
-    
-    phot_cycle_left   = widget_button(apphot_cycle_base, value=' <---- ',  uvalue='cycle_left')
-    phot_cycle_right  = widget_button(apphot_cycle_base, value=' ----> ',  uvalue='cycle_right')
-    do_all            = widget_button(apphot_cycle_base, value=' Do all ', uvalue='do_all')
-    
-    photsettings_id   = widget_button(apphot_data_base1, value = 'Photometry settings ...', $
-      uvalue = 'photsettings', xsize=175)
-      
-    if (state.photprint EQ 0) then begin
-      photstring = 'Write results to file ...'
-    endif else begin
-      photstring = 'Close photometry file'
-    endelse
-    
-    state.photprint_id   = widget_button(apphot_data_base1, value = photstring, $
-      uvalue = 'photprint', xsize=175)
-      
-    state.showradplot_id = widget_button(apphot_data_base1, value = 'Show radial profile', $
-      uvalue = 'showradplot', xsize=175)
-      
-    state.radplot_widget_id = widget_draw(apphot_draw_base, scr_xsize=1, scr_ysize=1)
-    
-    if state.phot_rad_plot_open eq 1 then begin
-      ysize = 300 < (state.screen_ysize - 300)
-      widget_control, state.radplot_widget_id, xsize=500, ysize=ysize
-      widget_control, state.showradplot_id, set_value='Hide radial profile' 
-    endif else begin
-      widget_control, state.radplot_widget_id, xsize=500, ysize=1
-      widget_control, state.showradplot_id, set_value='Show radial profile'
-    endelse
-    
-    photzoom_widget_id = widget_draw(apphot_plot_base, scr_xsize=state.photzoom_size, scr_ysize=state.photzoom_size)
-    
-    ; populate apphot_data_base2
-    fldmask = 'XXXXXXXXX: XX.XX X X.XX | XXXXX: XX.XX'
-    
-    state.photwarning_id = widget_label(apphot_data_base2, value=fldmask, /dynamic_resize)
-    
-    state.objfwhm_id = widget_label(apphot_data_base2, value=fldmask, uvalue='fwhm', /align_left)                  ; FWHM / SNR
-    
-    state.photresult_id = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photresult', /align_left)  ; Obj Mag +/- err
-    
-    state.skyresult_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'skyresult', /align_left)   ; Sky Bkg +/- err
-    
-    state.photerror_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photerror', /align_left)   ; Inst Prec / Limit Mag
-    
-    apphot_done = widget_button(apphot_data_base2, value = 'Done', uvalue = 'apphot_done')
-    
-    widget_control, apphot_base,/realize
-    
-    widget_control, photzoom_widget_id, get_value=tmp_value
-    state.photzoom_window_id = tmp_value
-    
-    widget_control, state.radplot_widget_id, get_value=tmp_value
-    state.radplot_window_id = tmp_value
-    
-    xmanager, 'phast_apphot', apphot_base, /no_block
-    
-    phast_resetwindow
+
+     apphot_base = $
+        widget_base(/base_align_center, $
+                    group_leader = state.base_id, $
+                    /column,$;xoffset=state.draw_window_size[0]+300, $
+                    title = 'phast aperture photometry', $
+                    uvalue = 'apphot_base')
+     
+     apphot_row_1     = widget_base(apphot_base,/row,/base_align_center)
+     apphot_insert1   = widget_base(apphot_base,/row,/base_align_center)
+     apphot_insert2   = widget_base(apphot_base,/row,/base_align_center)
+     apphot_row_2     = widget_base(apphot_base,/row,/base_align_center)
+     apphot_draw_base = widget_base(apphot_base,/row,/base_align_center, frame=0)
+     
+     apphot_data_base1a  = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_left)
+     apphot_plot_base    = widget_base(apphot_row_1, /column, frame=4,xsize=240,ysize=200, /base_align_center)
+     
+     apphot_data_insert1 = widget_base(apphot_insert1,/row,   frame=4,xsize=492,ysize= 50, /base_align_center)
+     apphot_data_insert2 = widget_base(apphot_insert2,/row,   frame=4,xsize=492,ysize= 50, /base_align_center)
+     
+     apphot_data_base1   = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130, /base_align_center)
+     apphot_data_base2   = widget_base(apphot_row_2, /column, frame=4,xsize=240,ysize=130 ,/base_align_center)
+     
+                                ; populate apphot_data_base1a
+     tmp_string1 = string(99999.0, 99999.0, format = '("Object position: (",f7.1,", ",f7.1,")")')
+     state.centerpos_id  = widget_label(apphot_data_base1a, value = tmp_string1, uvalue = 'centerpos', /align_center)
+     
+     state.apphot_wcs_id = widget_label(apphot_data_base1a, value='--- No WCS Info ---', /align_center, /dynamic_resize)
+     
+     state.centerbox_id = $
+        cw_field(apphot_data_base1a, $
+                 /long, $
+                 /return_events, $
+                 title = 'Centering box size (pix):', $
+                 uvalue = 'centerbox', $
+                 value = state.centerboxsize, $
+                 xsize = 7)
+     
+     state.radius_id = $
+        cw_field(apphot_data_base1a, $
+                 /floating, $
+                 /return_events, $
+                 title = '   Aperture radius (pix):', $
+                 uvalue = 'radius', $
+                 value = state.aprad, $
+                 xsize = 7)
+     
+     state.innersky_id = $
+        cw_field(apphot_data_base1a, $
+                 /floating, $
+                 /return_events, $
+                 title = '  Inner sky radius (pix):', $
+                 uvalue = 'innersky', $
+                 value = state.innersky, $
+                 xsize = 7)
+     
+     state.outersky_id = $
+        cw_field(apphot_data_base1a, $
+                 /floating, $
+                 /return_events, $
+                 title = '  Outer sky radius (pix):', $
+                 uvalue = 'outersky', $
+                 value = state.outersky, $
+                 xsize = 7)
+     
+                                ; populate apphot_data_insert1
+     if state.magunits EQ 1 then state.phot_aperFWHM = round(100*state.objFWHM)/100.0                       $
+     else state.phot_aperFWHM = round(100*state.objFWHM * state.pixelscale)/100.0
+     
+     state.phot_aperFWHM_ID  = cw_field(apphot_data_insert1, /floating, /return_events, uvalue = 'aperFWHM', $
+                                        value = state.phot_aperFWHM, title='Apertures:   FWHM', xsize = 4, /row)
+     
+     state.phot_aperUnit_ID  = cw_field(apphot_data_insert1, /string, uvalue = 'aperUnit', $
+                                        value = state.phot_aperList[state.magunits], title='', xsize = 2, /row)
+     
+     
+     state.phot_aperTrain_ID = widget_button(apphot_data_insert1, value = 'Train', uvalue = 'aperTrain', xsize=50)
+     
+     state.phot_aperType_ID  = cw_bgroup(apphot_data_insert1, ['Snap To', 'Centroid', 'Manual'], uvalue = 'aperType', $
+                                         button_uvalue = [0, 1, 2], set_value = 0, label_left = '', $
+                                         /exclusive, /no_release, /row)
+     
+                                ; populate apphot_data_insert2
+     photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
+     if count eq 0 then begin
+        state.photSpecType = 'K'
+        photSpecTypeNum = where( state.photSpecList eq state.photSpecType, count )
+     endif
+     state.photSpecTypeNum = (0 > photSpecTypeNum[0]) < 9
+     state.photSpec_Type_ID = cw_bgroup(apphot_data_insert2, state.photSpecList, uvalue = 'spectralLtr',  $
+                                        button_uvalue = state.photSpecList,                              $
+                                        /exclusive, set_value = state.photSpecTypeNum,                   $
+                                        /no_release,                                                     $
+                                        /row)
+     
+     state.photSpecSubNum = (0 > state.photSpecSubNum) < 9
+     state.photSpec_Num_ID  = cw_field(apphot_data_insert2, /long, /return_events, uvalue = 'spectralNum', $
+                                       value = state.photSpecSubNum, title='', xsize = 1, /row)
+     
+     colors = phast_intrinsic_colors(state.photSpecTypeNum, state.photSpecSubNum)
+     state.photSpecBmV = colors[0]
+     state.photSpecVmR = colors[1]
+     state.photSpecRmI = colors[2]
+     
+     state.photSpec_BmV_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralBmV', $
+                                       value = state.photSpecBmV, title='B-V', xsize = 4, /row)
+     
+     state.photSpec_VmR_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralVmR', $
+                                       value = state.photSpecVmR, title='V-R', xsize = 4, /row)
+     
+     state.photSpec_RmI_ID  = cw_field(apphot_data_insert2, /floating, /return_events, uvalue = 'spectralRmI', $
+                                       value = state.photSpecRmI, title='R-I', xsize = 4, /row)
+     
+     
+                                ; populate apphot_data_base1
+     apphot_cycle_base = widget_base(apphot_data_base1,/row)
+     
+     phot_cycle_left   = widget_button(apphot_cycle_base, value=' <---- ',  uvalue='cycle_left')
+     phot_cycle_right  = widget_button(apphot_cycle_base, value=' ----> ',  uvalue='cycle_right')
+     do_all            = widget_button(apphot_cycle_base, value=' Do all ', uvalue='do_all')
+     
+     photsettings_id   = widget_button(apphot_data_base1, value = 'Photometry settings ...', $
+                                       uvalue = 'photsettings', xsize=175)
+     
+     if (state.photprint EQ 0) then begin
+        photstring = 'Write results to file ...'
+     endif else begin
+        photstring = 'Close photometry file'
+     endelse
+     
+     state.photprint_id   = widget_button(apphot_data_base1, value = photstring, $
+                                          uvalue = 'photprint', xsize=175)
+     
+     state.showradplot_id = widget_button(apphot_data_base1, value = 'Show radial profile', $
+                                          uvalue = 'showradplot', xsize=175)
+     
+     state.radplot_widget_id = widget_draw(apphot_draw_base, scr_xsize=1, scr_ysize=1)
+     
+     if state.phot_rad_plot_open eq 1 then begin
+        ysize = 300 < (state.screen_ysize - 300)
+        widget_control, state.radplot_widget_id, xsize=500, ysize=ysize
+        widget_control, state.showradplot_id, set_value='Hide radial profile' 
+     endif else begin
+        widget_control, state.radplot_widget_id, xsize=500, ysize=1
+        widget_control, state.showradplot_id, set_value='Show radial profile'
+     endelse
+     
+     photzoom_widget_id = widget_draw(apphot_plot_base, scr_xsize=state.photzoom_size, scr_ysize=state.photzoom_size)
+     
+                                ; populate apphot_data_base2
+     fldmask = 'XXXXXXXXX: XX.XX X X.XX | XXXXX: XX.XX'
+     
+     state.photwarning_id = widget_label(apphot_data_base2, value=fldmask, /dynamic_resize)
+     
+     state.objfwhm_id = widget_label(apphot_data_base2, value=fldmask, uvalue='fwhm', /align_left) ; FWHM / SNR
+     
+     state.photresult_id = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photresult', /align_left) ; Obj Mag +/- err
+     
+     state.skyresult_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'skyresult', /align_left) ; Sky Bkg +/- err
+     
+     state.photerror_id  = widget_label(apphot_data_base2, value = fldmask, uvalue = 'photerror', /align_left) ; Inst Prec / Limit Mag
+     
+     apphot_done = widget_button(apphot_data_base2, value = 'Done', uvalue = 'apphot_done')
+     
+     widget_control, apphot_base,/realize
+     
+     widget_control, photzoom_widget_id, get_value=tmp_value
+     state.photzoom_window_id = tmp_value
+     
+     widget_control, state.radplot_widget_id, get_value=tmp_value
+     state.radplot_window_id = tmp_value
+     
+     xmanager, 'phast_apphot', apphot_base, /no_block
+     
+     phast_resetwindow
   endif
   
   phast_apphot_refresh

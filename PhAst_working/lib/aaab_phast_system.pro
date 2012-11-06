@@ -1,6 +1,6 @@
 ;-------------------------------------------------------------------
 
-pro phas_slicer_event, event
+pro phastslicer_event, event
 
   ; event handler for data cube slice selector widgets
 
@@ -461,6 +461,19 @@ pro phast_drawdepth, event
 end
 
 ;----------------------------------------------------------------------
+
+pro phast_debug_info
+
+;routine to print some basic debugging info to the screen
+
+common phast_state
+common phast_images
+
+help, image_archive, main_image
+help, state, /structure
+end
+
+;----------------------------------------------------------------------
       
 pro phast_drawvector, event
   
@@ -641,7 +654,9 @@ pro phast_draw_event, event
         'color':  phast_draw_color_event, event
         'zoom':   phast_draw_zoom_event, event
         'blink':  phast_draw_blink_event, event
-        'imexam': phast_draw_phot_event, event
+        'imexam': begin ;prevent photometry errors on start screen
+           if state.num_images gt 0 then phast_draw_phot_event, event
+        end
         'vector': phast_draw_vector_event, event
         'label':  phast_draw_label_event, event
      endcase
@@ -2082,8 +2097,9 @@ pro phast_read_config
   common phast_state
   common phast_mpc_data
   common phast_images
-  if file_test('phast.conf') eq 1 then begin
-    readcol,'phast.conf',var,val,FORMAT='A,A',/silent,delim=string(9b),comment='#'
+
+  if file_test(state.phast_dir+'phast.conf') eq 1 then begin
+    readcol,state.phast_dir+'phast.conf',var,val,FORMAT='A,A',/silent,delim=string(9b),comment='#'
     for i=0, n_elements(var)-1 do begin
       case strlowcase(strtrim(var[i])) of
         ;calibration
@@ -2209,15 +2225,16 @@ pro phast_read_filters
 ;read the phast.filters file containing filter passband characteristics used in photometry
 
   common phast_state
-  
+  common phast_filters, filters  
+
   filename = 'phast.filters'
   
   error = 0
   if not file_test(filename) then begin
     print, 'Passband configuration file phast.filters not found'
-    
+    state.filters_loaded = 0
   endif else begin
-  
+     state.filters_loaded = 1
     comment = '#'
     line = ''
     OPENR, lun, filename, /GET_LUN
@@ -2286,7 +2303,7 @@ pro phast_read_filters
                         
    state.nFilters = nFilters
                         
-   common phast_filters, filters
+
    filters = { fitsKey:fitsKeyword, N:nFilters, nameFilter:nameFilter, transCoeff:transCoeff, transTerm:transTerm, $
              zeroPoint:zeroPoint,   errZeroPt:errZeroPt, atmExtinct:atmExtinct, atmColorVI:atmColorVI,             $
               doZeroPt:doZeroPt,      magBand:magFilter,   fitColor:fitColor,      fitTerm:fitTerm     }
@@ -2451,7 +2468,7 @@ pro phast_remove_image,index=index,all=all
               j++
            endif
         endfor
-        image_archive = temp_image
+        image_archive[0] = temp_image
         while 1 eq 1 do begin   ;choose only one
            if index eq 0 then begin
               state.num_images--
@@ -2753,7 +2770,7 @@ end
 
 ;---------------------------------------------------------------------
 
-pro phast_startup
+pro phast_startup, phast_dir, launch_dir
 
 ; This routine initializes the phast internal variables, and creates and
 ; realizes the window widgets.  It is only called by the phast main
@@ -2777,7 +2794,7 @@ pro phast_startup
   endif
         
   ; Initialize the common blocks
-  phast_initcommon
+  phast_initcommon, phast_dir, launch_dir
         
   state.active_window_pmulti = !p.multi
   !p.multi = 0
@@ -2959,6 +2976,7 @@ pro phast_startup
                   {cw_pdmenu_s, 2, 'Batch process'}, $
                   {cw_pdmenu_s, 1, 'Help'}, $ ; help menu
                   {cw_pdmenu_s, 0, 'PHAST Help'},$
+                  {cw_pdmenu_s, 0, 'Debug info'},$                  
                   {cw_pdmenu_s, 2, 'Check for updates'}$
                   ]
           
@@ -3257,7 +3275,7 @@ pro phast_startup
   state.base_pad[1] = 20        ;set y pad staticlly
         
   ;check for output directories
-  if not (file_test('output',/directory) and file_test('output/images',/directory) and file_test('output/catalogs',/directory)) then begin
+  if not (file_test(phast_dir+'output',/directory) and file_test('output/images',/directory) and file_test('output/catalogs',/directory)) then begin
      result = dialog_message('Output directories not found.  Create them?',/question,/center)
      if result eq 'Yes' then begin
         file_mkdir,'output/images'
@@ -3378,10 +3396,10 @@ pro phast_topmenu_event, event
      'PNG': phast_writeimage, 'png'
      'JPEG': phast_writeimage, 'jpg'
      'TIFF': phast_writeimage, 'tiff'
-     'WriteMPEG': phast_write_mpeg
+     ;'WriteMPEG': phast_write_mpeg
      'GetImage':
      ' DSS': phast_getdss
-     ' FIRST': phast_getfirst
+     ;' FIRST': phast_getfirst
      'LoadRegions': phast_loadregion
      'SaveRegions': phast_saveregion
      'Remove current image': phast_remove_image,index=state.current_image_index
@@ -3547,6 +3565,7 @@ pro phast_topmenu_event, event
      
      ; Help options:
      'PHAST Help': phast_help
+     'Debug info': phast_debug_info
      'Check for updates': phast_check_updates
      
      else: print, 'Unknown event in file menu!'
