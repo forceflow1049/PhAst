@@ -3303,11 +3303,12 @@ pro phast_startup, phast_dir, launch_dir
   state.base_pad[1] = 20        ;set y pad staticlly
         
   ;check for output directories
-  if not (file_test(phast_dir+'output',/directory) and file_test('output/images',/directory) and file_test('output/catalogs',/directory)) then begin
+
+  if not (file_test(phast_dir+'output',/directory) and file_test(phast_dir+'output/images',/directory) and file_test(phast_dir+'output/catalogs',/directory)) then begin
      result = dialog_message('Output directories not found.  Create them?',/question,/center)
      if result eq 'Yes' then begin
-        file_mkdir,'output/images'
-        file_mkdir,'output/catalogs'
+        file_mkdir,phast_dir+'output/images'
+        file_mkdir,phast_dir+'output/catalogs'
      endif else begin
         result = dialog_message('PHAST will not function correctly without the appropriate output directories.',/center)
      endelse
