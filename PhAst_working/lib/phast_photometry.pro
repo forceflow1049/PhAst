@@ -12,8 +12,7 @@ pro phast_apphot
   if state.align_toggle eq 1 then offset = phast_get_image_offset()
   
   state.cursorpos = state.coord - offset
-  
-  ;update the exposure length and zero-point from image header
+   ;update the exposure length and zero-point from image header
   if state.num_images gt 0 and state.image_type eq 'FITS' then begin
     ;head = headfits(state.imagename)
      head = image_archive[state.current_image_index]->get_header(/string)
@@ -25,7 +24,8 @@ pro phast_apphot
      state.photzclr  = sxpar(head,'MAGZCLR')
      state.photztrm  = sxpar(head,'MAGZTRM')
      state.photznum  = sxpar(head,'MAGZNUM')
-     ; zeropoint pre-determined by user; or instrumental if no zeropoint
+                                ; zeropoint pre-determined by user; or
+                                ; instrumental if no zeropoint
      if filters.doZeroPt[state.posFilter] EQ 0 then begin
         state.photzpt  = filters.Zeropoint[state.posFilter]
         state.photzerr = filters.errZeroPt[state.posFilter]

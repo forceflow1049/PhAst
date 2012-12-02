@@ -2257,6 +2257,10 @@ pro phast_read_filters
   if not file_test(filename) then begin
     print, 'Passband configuration file phast.filters not found'
     state.filters_loaded = 0
+    filters = { fitsKey:'AnY FILTERS', N:'1', nameFilter:'R', transCoeff:0.0, transTerm:'N/A', $
+                zeroPoint:99.9,   errZeroPt:0.0, atmExtinct:0.0, atmColorVI:0.0,             $
+                doZeroPt:1,      magBand:'R',   fitColor:0,      fitTerm:'N/A'     }
+    
   endif else begin
      state.filters_loaded = 1
     comment = '#'
@@ -2417,7 +2421,7 @@ pro phast_read_filters
        endif
     endfor
           
-    endelse        
+ endelse        
     
     if error then begin
         ; patch should terminate program here
@@ -3378,50 +3382,46 @@ pro phast_topmenu_event, event
      end
           
      'Read VICAR file': begin
-        if file_test('read_vicar.pro') eq 1 and file_test('vicgetpars.pro') eq 1 then begin
-           newimage=0
-           phast_read_vicar,  newimage=newimage
-           if newimage eq 1 then begin
-              phast_getstats, align=state.default_align
-              if (state.default_align EQ 0) then begin
-                 state.zoom_level =  0
-                 state.zoom_factor = 1.0
-              endif
-              if (state.default_stretch EQ 0 AND $
-                  state.default_autoscale EQ 1) then phast_autoscale
-              if (state.firstimage EQ 1) then phast_autoscale
-              phast_set_minmax
-              phast_displayall
-              phast_settitle
-              state.firstimage = 0
-              state.image_type = 'VICAR'
+        newimage=0
+        phast_read_vicar,  newimage=newimage
+        if newimage eq 1 then begin
+           phast_getstats, align=state.default_align
+           if (state.default_align EQ 0) then begin
+              state.zoom_level =  0
+              state.zoom_factor = 1.0
            endif
-        endif else result = dialog_message('VICAR files cannot be opened without read_vicar.pro and vicgetpars.pro',/center,/error)
+           if (state.default_stretch EQ 0 AND $
+               state.default_autoscale EQ 1) then phast_autoscale
+           if (state.firstimage EQ 1) then phast_autoscale
+           phast_set_minmax
+           phast_displayall
+           phast_settitle
+           state.firstimage = 0
+           state.image_type = 'VICAR'
+        endif
      end
-          
+     
      'Read VICAR directory': begin
-        if file_test('read_vicar.pro') eq 1 and file_test('vicgetpars.pro') eq 1 then begin
-           newimage=0
-           phast_read_vicar, /dir, newimage=newimage
-           if newimage eq 1 then begin
-              phast_getstats, align=state.default_align
-              if (state.default_align EQ 0) then begin
-                 state.zoom_level =  0
-                 state.zoom_factor = 1.0
-              endif
-              if (state.default_stretch EQ 0 AND $
-                  state.default_autoscale EQ 1) then phast_autoscale
-              if (state.firstimage EQ 1) then phast_autoscale
-              phast_set_minmax
-              phast_image_switch,0
-              phast_displayall
-              phast_settitle
-              state.firstimage = 0
-              state.image_type = 'VICAR'
+        newimage=0
+        phast_read_vicar, /dir, newimage=newimage
+        if newimage eq 1 then begin
+           phast_getstats, align=state.default_align
+           if (state.default_align EQ 0) then begin
+              state.zoom_level =  0
+              state.zoom_factor = 1.0
            endif
-        endif else result = dialog_message('VICAR files cannot be opened without read_vicar.pro and vicgetpars.pro',/center,/error)
-          end
-          
+           if (state.default_stretch EQ 0 AND $
+               state.default_autoscale EQ 1) then phast_autoscale
+           if (state.firstimage EQ 1) then phast_autoscale
+           phast_set_minmax
+           phast_image_switch,0
+           phast_displayall
+           phast_settitle
+           state.firstimage = 0
+           state.image_type = 'VICAR'
+        endif
+     end
+     
           
      'Write FITS file': phast_writefits
      'Write postscript file' : phast_writeps
