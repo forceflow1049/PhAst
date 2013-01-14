@@ -161,6 +161,8 @@ pro phast_initcommon, phast_dir, launch_dir
     }
     
   state = {                $
+    combine_dir: '', $      ;directory of images to be combined
+    combine_dir_widget_id: 0L,$;widget ID for selecting combine dir
     align_toggle_button: 0l, $;widget ID for align toggle button
     filters_loaded: 0, $    ;are filter specifications loaded?
     launch_dir: launch_dir, $;location where phast is being run 

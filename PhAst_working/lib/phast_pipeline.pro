@@ -861,7 +861,78 @@ pro phast_do_all
   result = dialog_message('Done!              ',/center,/information)
   
 end
+;----------------------------------------------------------------------
 
+pro phast_combine
+
+;routine to combine files in a directory into one master file using a
+;median combine
+
+  common phast_state
+
+  file_list = findfile(state.combine_dir+'*.fits')
+  
+  image_1 = readfits(file_list[0])
+  dim = size(image_1)
+  loaded_files = dblarr(dim[1],dim[2],n_elements(file_list))
+  loaded_files[0,0,0] = image_1
+  
+  for i=1, n_elements(file_list)-1 do loaded_files[0,0,i] = readfits(file_list[i])
+
+  output_image = dblarr(dim[1],dim[2])
+  medarr, loaded_files, output_image
+
+  writefits, state.phast_dir+'/output/images/phast_combined.fits', output_image
+end
+;----------------------------------------------------------------------
+
+
+pro phast_combine_gui
+
+;front end for combining files
+
+  common phast_state
+
+  if (not (xregistered('phast_combine', /noshow))) then begin
+  
+     combine_base = $
+        widget_base(/base_align_left, $
+                    /column, $
+                    title = 'Combine FITS files', $
+                    xsize = 500)
+     desc_label = widget_label(combine_base,value='Perform a median combine on a directory of FITS files')
+     temp_base = widget_base(combine_base,/row)
+     dir_select = widget_button(temp_base,value='Choose Directory',uvalue='dir_select')
+     dir_name = widget_label(temp_base,value='No directory selected',/dynamic_resize)
+     buttonbox = widget_base(combine_base,/row)
+     start_combine = widget_button(buttonbox,value='Start', uvalue='start_combine')
+     done = widget_button(buttonbox,value='Done',uvalue='done')
+     
+     state.combine_dir_widget_id = dir_name
+     widget_control, combine_base, /realize
+     
+     xmanager, 'phast_combine_gui', combine_base, /no_block
+     
+     phast_resetwindow
+  endif
+end
+;----------------------------------------------------------------------
+
+pro phast_combine_gui_event,event
+
+  common phast_state
+  
+  widget_control, event.id, get_uvalue = uvalue
+  
+  case uvalue of
+    'dir_select': begin
+      state.combine_dir = dialog_pickfile(/directory,/read)
+      widget_control,state.combine_dir_widget_id,set_value=state.combine_dir
+    end
+    'start_combine': phast_combine
+    'done':widget_control,event.top,/destroy    
+  endcase
+end
 ;----------------------------------------------------------------------
 
 pro phast_do_batch

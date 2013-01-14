@@ -2993,6 +2993,7 @@ pro phast_startup, phast_dir, launch_dir
                   {cw_pdmenu_s, 0, '--------------'},$
                   {cw_pdmenu_s, 2, 'MPC report'},$
                   {cw_pdmenu_s, 1, 'Pipeline'}, $
+                  {cw_pdmenu_s, 0, 'Combine images'},$
                   {cw_pdmenu_s, 0, 'Calibration'},$
                   {cw_pdmenu_s, 0, '--------------'},$
                   {cw_pdmenu_s, 0, 'SExtractor'}, $
@@ -3583,6 +3584,7 @@ pro phast_topmenu_event, event
      'Visible': state.filter_color = 'Visible'
      'Red': state.filter_color = 'Red'
      ;Pipeline options
+     'Combine images': phast_combine_gui
      'Calibration': phast_calibrate_image
      'SExtractor': phast_sextractor
      'SCAMP': phast_scamp
