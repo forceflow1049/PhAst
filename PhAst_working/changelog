@@ -1,8 +1,5 @@
--PhAst split into nine files, stored in lib direcotry [Morgan Rehnberg]
--Fixed huge memory leak in image archive.  Memory should be totally conserved now [Morgan Rehnberg]
--new chunking behavior for expanding image_archive [Morgan Rehnberg]
--fixed bugs in image calibration [Morgan Rehnberg]
--added keyboard shortcuts for switching images (Page Up/Down, Home/End) [Morgan Rehnberg]
--restricted rotation to 90,180,270, but fixed rotation of rectangular images [Morgan Rehnberg]
--tweaked opening behavior of photometry window [Morgan Rehnberg]
--Fixed bug with remvoving images [Morgan Rehnberg]
+New features:
+-Added ability to combine images [Morgan Rehnberg]
+Bugs fixed:
+-Fixed crash when aligning images [Morgan Rehnberg]
+-fixed crasg when batch calibrating a directory [Morgan Rehnberg]

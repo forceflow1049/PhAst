@@ -207,6 +207,9 @@ phast_pipeline: procedures for image processing
      phast_callibrate
      phast_calibrate_image
      phast_calibrate_image_event
+     phast_combine
+     phast_combine_gui
+     phast_combine_gui_event
      phast_do_all
      phast_do_batch
      phast_do_missfits

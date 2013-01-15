@@ -1046,15 +1046,10 @@ pro phast_gettrack
   startx = abs( (zcenter[0] - boxsize) < 0 )
   starty = abs( (zcenter[1] - boxsize) < 0 )
   
-  ;correct for index overruns
-  dim = size(track)
-  if startx gt dim[1]-1 then startx = dim[1]-1
-  if starty gt dim[2]-1 then starty = dim[2]-1
-
   track[startx,starty] = scaled_image[xmin:xmax,ymin:ymax]
   track_image = rebin(track, $
-                      state.track_window_size, state.track_window_size, $
-                      /sample)
+    state.track_window_size, state.track_window_size, $
+    /sample)
     
   phast_setwindow, state.track_window_id
   tv, track_image

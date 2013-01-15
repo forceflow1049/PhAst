@@ -14,38 +14,38 @@ pro phast_batch
       widget_base(/base_align_left, $
       group_leader = state.base_id, $
       /column, $
-      title = 'Process FITS files', $
-      uvalue = 'batch_base')
+      title = 'Batch image processing', $
+      uvalue = 'apphot_base')
       
     image_label = widget_label(batch_base,value='Select images')
-    image_base  = widget_base(batch_base,frame=4,/column,xsize=600)
+    image_base  = widget_base(batch_base,frame=4,/column,xsize=500)
     cal_label = widget_label(batch_base,value='Calibration settings')
-    calibrate_base = widget_base(batch_base,frame=4,/column,xsize=600)
+    calibrate_base = widget_base(batch_base,frame=4,/column,xsize=500)
     sex_label = widget_label(batch_base,value='SExtractor settings')
-    sextractor_base = widget_base(batch_base,frame=4,/row,xsize=600)
+    sextractor_base = widget_base(batch_base,frame=4,/row,xsize=500)
     scamp_label = widget_label(batch_base,value='SCAMP settings')
-    scamp_base = widget_base(batch_base,frame=4,/row,xsize=600)
+    scamp_base = widget_base(batch_base,frame=4,/row,xsize=500)
     missfits_label = widget_label(batch_base,value='missFITS settings')
-    missfits_base = widget_base(batch_base,frame=4,/row,xsize=600)
+    missfits_base = widget_base(batch_base,frame=4,/row,xsize=500)
     
     ;image base
     number_select_base = widget_base(image_base,/exclusive,/column)
     multi_image_toggle = widget_button(number_select_base,value='Process multiple images', uvalue='multi_image_toggle')
     single_image_toggle = widget_button(number_select_base,value='Process a single image', uvalue='single_image_toggle')
-    line = widget_label(image_base, value='-------------------------------------------------------------------------------------------------')
+    line = widget_label(image_base, value='----------------------------------------------------------------------------------')
 
-    state.batch_multi_image_base = widget_base(image_base,/row)
+    state.batch_multi_image_base = widget_base(image_base,/row,sensitive=0)
     image_toggles = widget_base(state.batch_multi_image_base,/row,/exclusive)
-    state.batch_current_toggle = widget_button(image_toggles,value='Current images',uvalue='current_toggle')
+    current_toggle = widget_button(image_toggles,value='Current images',uvalue='current_toggle')
     dir_toggle = widget_button(image_toggles,value='Directory',uvalue='dir_toggle')
     dirname_base = widget_base(state.batch_multi_image_base,/row)
     state.batch_select_dir = widget_button(dirname_base,value='Select directory',uvalue='select_dir',sensitive=0)
     state.batch_dir_id = widget_label(dirname_base,value=' No directory selected',/dynamic_resize,sensitive=0)
 
-    state.batch_single_image_base = widget_base(image_base,/row,sensitive=0)
+    state.batch_single_image_base = widget_base(image_base,/row)
     image_toggles = widget_base(state.batch_single_image_base,/row,/exclusive)
-    state.batch_single_current_toggle = widget_button(image_toggles,value='Current image',uvalue='single_current_toggle')
-    ext_toggle = widget_button(image_toggles,value='External image',uvalue='external_toggle')
+    single_current_toggle = widget_button(image_toggles,value='Current image',uvalue='_single_current_toggle',sensitive=0)
+    ext_toggle = widget_button(image_toggles,value='External image',uvalue='external_toggle',sensitive=0)
     extname_base = widget_base(state.batch_single_image_base,/row)
     state.batch_select_image = widget_button(extname_base,value='Select image',uvalue='select_image',sensitive=0)
     state.batch_image_id = widget_label(extname_base,value=' No image selected',/dynamic_resize, sensitive=0)
@@ -92,9 +92,7 @@ pro phast_batch
     xmanager, 'phast_batch', batch_base, /no_block
     
     ;set intial button states
-    widget_control, state.batch_current_toggle, set_button=1  &  state.batch_source = 0
-    widget_control, state.batch_single_current_toggle, set_button=1
-
+    widget_control, current_toggle, set_button=1  &  state.batch_source = 0
     if state.bias_toggle eq 1 then begin
       widget_control,bias_toggle,set_button=1
       widget_control,state.bias_select_id,sensitive=1
@@ -127,18 +125,10 @@ pro phast_batch_event,event
   case uvalue of
   
     ;image base
-     'multi_image_toggle': begin
-        widget_control, state.batch_multi_image_base, sensitive=1
-        widget_control, state.batch_single_image_base, sensitive=0
-        widget_control, state.batch_current_toggle, set_button=1
-        state.batch_source = 0
-     end
+     'multi_image_toggle':
      'single_image_toggle': begin
         widget_control, state.batch_multi_image_base, sensitive=0
         widget_control, state.batch_single_image_base, sensitive=1
-        widget_control, state.batch_single_current_toggle, set_button=1
-        state.batch_source = 2
-        
      end
      'dark_toggle': begin
         if state.dark_toggle eq 0 then begin
@@ -195,36 +185,15 @@ pro phast_batch_event,event
            widget_control,state.batch_dir_id,sensitive=1
         endif
      end
-     'select_image': begin
-        state.batch_imagename = dialog_pickfile(filter='*.fits',/must_exist)
-       if state.batch_imagename ne '' then begin
-           widget_control,state.batch_image_id,set_value=state.batch_imagename
-           widget_control,state.batch_image_id,sensitive=1
-        endif
-     end
      'current_toggle': begin
         widget_control,state.batch_select_dir,sensitive=0
-        widget_control,state.batch_dir_id,sensitive=0
         state.batch_source = 0
         state.batch_dirname = ''
-        widget_control,state.batch_dir_id,set_value=' No Directory selected'
+        widget_control,state.batch_dir_id,set_value=' No Directory Selected'
      end
      'dir_toggle': begin
         widget_control,state.batch_select_dir,sensitive=1
-        widget_control,state.batch_dir_id,sensitive=1
         state.batch_source = 1
-     end
-     'single_current_toggle': begin
-        widget_control, state.batch_select_image, sensitive=0
-        widget_control,state.batch_image_id,sensitive=0
-        state.batch_source = 2
-        state.batch_imagename = ''
-        widget_control,state.batch_image_id,set_value=' No image selected'
-     end
-     'external_toggle': begin
-        widget_control,state.batch_select_image,sensitive=1
-        widget_control,state.batch_image_id,sensitive=1
-        state.batch_source = 3
      end
      'over_correct': begin
         if state.over_toggle eq 0 then begin
@@ -1005,15 +974,7 @@ pro phast_do_batch
       for i=0, num_files-1 do filelist[i] = image_archive[i]->get_name()
     end
     1: filelist = findfile(state.batch_dirname+'*.fits',count=num_files)
-    2: begin
-       filelist = image_archive[state.current_image_index]->get_name()
-       num_files = 1
-    end
-    3: begin
-       filelist = state.batch_imagename
-       num_files = 1
-    end
- endcase
+  endcase
   
   for i=0,num_files-1 do begin
     fits_read,filelist[i],cal_science,cal_science_head

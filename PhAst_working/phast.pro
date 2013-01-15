@@ -161,6 +161,11 @@ pro phast_initcommon, phast_dir, launch_dir
     }
     
   state = {                $
+    batch_current_toggle:0L,$;widget ID for current image button
+    batch_single_current_toggle:0L,$;widget ID for single image button
+    batch_imagename: '', $  ;image to be processed
+    batch_single_image_base:0L,$;base ID for batch single base
+    batch_multi_image_base:0L,$;base ID for batch multi base
     combine_dir: '', $      ;directory of images to be combined
     combine_dir_widget_id: 0L,$;widget ID for selecting combine dir
     align_toggle_button: 0l, $;widget ID for align toggle button
@@ -178,6 +183,8 @@ pro phast_initcommon, phast_dir, launch_dir
     bias_filename: 'No bias loaded',$;name of bias file
     flat_filename: 'No flat loaded',$;name of flat file
     dark_filename: 'No dark loaded',$;name of dark file
+    batch_image_id: 0L, $   ;widget ID for batch image display
+    batch_select_image: 0L,$;widget ID for image select button
     batch_source: -1, $     ;what images to calibrate?
     batch_select_dir: 0L, $ ;widget id for dir select button
     batch_dirname: '', $    ;location of image batch
