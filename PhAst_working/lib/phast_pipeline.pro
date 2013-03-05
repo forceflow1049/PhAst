@@ -21,6 +21,8 @@ pro phast_batch
     image_base  = widget_base(batch_base,frame=4,/column,xsize=600)
     cal_label = widget_label(batch_base,value='Calibration settings')
     calibrate_base = widget_base(batch_base,frame=4,/column,xsize=600)
+    astrometry_toggle_box = widget_base(batch_base,/nonexclusive)
+    astrometry_toggle = widget_button(astrometry_toggle_box,value='Compute astrometry:',uvalue='astrometry_toggle')
     sex_label = widget_label(batch_base,value='SExtractor settings')
     sextractor_base = widget_base(batch_base,frame=4,/row,xsize=600)
     scamp_label = widget_label(batch_base,value='SCAMP settings')
@@ -55,6 +57,11 @@ pro phast_batch
     cal_select_box = widget_base(calibrate_base,/row)
     overscan_base = widget_base(calibrate_base,/nonexclusive,/column)
     over_correct = widget_button(overscan_base,value='Overscan correction',uvalue='over_correct')
+    ;; bin_box = widget_base(calibrate_base,/row)
+    ;; x_label = widget_label(bin_box,value='Bin x:')
+    ;; state.bin_x_widget = widget_text(bin_box,value=strtrim(string(state.x_bin),1),uvalue='bin_x_widget',xsize=5,/all_events,/editable)
+    ;; y_label = widget_label(bin_box,value='Bin y:')
+    ;; state.bin_y_widget = widget_text(bin_box,value=strtrim(string(state.y_bin),1),uvalue='bin_y_widget',xsize=5,/all_events,/editable)
     button_box1 = widget_base(cal_select_box,/nonexclusive,/column)
     bias_toggle = widget_button(button_box1,value='Bias',uvalue='bias_toggle')
     flat_toggle = widget_button(button_box1,value='Flat',uvalue='flat_toggle')
@@ -70,6 +77,7 @@ pro phast_batch
     state.flat_label_id = widget_label(label_box1,value=state.flat_filename, /align_left, /dynamic_resize)
     spacer_3 = widget_label(label_box1,value='')
     state.dark_label_id = widget_label(label_box1,value=state.dark_filename, /align_left, /dynamic_resize)
+
 
     ;SExtractor base
     sex_flags_label = widget_label(sextractor_base,value='Flags:')
@@ -108,6 +116,7 @@ pro phast_batch
       widget_control,state.flat_select_id,sensitive=1
     end
     if state.over_toggle eq 1 then widget_control,over_correct,set_button=1
+    if state.astrometry_toggle eq 1 then widget_control,astrometry_toggle,set_button=1
     
     phast_resetwindow
   endif
@@ -233,7 +242,22 @@ pro phast_batch_event,event
            state.over_toggle = 0
         endelse
      end
-     
+     'bin_x_widget': begin
+        widget_control, state.bin_x_widget,get_value=value
+        state.x_bin = float(value)
+     end
+     'bin_y_widget': begin
+        widget_control, state.bin_y_widget,get_value=value
+        state.y_bin = float(value)
+     end    
+                                ;astrometry toggle
+     'astrometry_toggle': begin
+        if state.astrometry_toggle eq 0 then begin
+           state.astrometry_toggle = 1
+        endif else begin
+           state.astrometry_toggle = 0
+        endelse
+     end
                                 ;SExtractor base
      'sex_flags': begin
         widget_control,state.sex_flags_widget_id,get_value=value
@@ -265,6 +289,10 @@ pro phast_batch_event,event
            endif
            if state.batch_source eq 0 and state.num_images eq 0 then begin
               result = dialog_message('No images are loaded!',/center)
+              break
+           endif
+           if state.x_bin eq 0 or state.y_bin eq 0 then begin
+              result = dialog_message('Bin size cannot be zero!',/center)
               break
            endif
            phast_do_batch
@@ -679,7 +707,13 @@ pro phast_calibrate
     map = flat/med
     ;divide by map
     main = main/map
+ endif
+  ;bin resulting image
+  if state.x_bin ne 1 or state.y_bin ne 1 then begin
+     size = size(main)
+     main = frebin(main,float(size[1])/state.x_bin, float(size[2])/state.y_bin,/total)
   endif
+
   size = size(main) ;get image size
   ra = sxpar(cal_science_head,'RA') ;get approx ra
   dec = sxpar(cal_science_head,'DEC') ;get approx dec
@@ -886,36 +920,6 @@ end
 
 ;----------------------------------------------------------------------
 
-pro phast_do_all
-
-  ;routine to automatically process an image through the entire pipeline
-
-  common phast_state
-  common phast_images
-  
-  widget_control, /hourglass
-  
-  ;run SExtractor
-  ;spawn, 'sex ' + state.imagename + ' -CATALOG_NAME phast.cat'
-  phast_do_sextractor, cat_name = 'phast.cat'
-  
-  ;run Scamp
-  ;spawn, 'scamp phast.cat'
-  phast_do_scamp,cat_name = 'phast.cat'
-  
-  ;write astrometric solution to calibrated image
-  ;spawn,'missfits phast.fits -SAVE_TYPE REPLACE'
-  phast_do_missfits, image = 'phast.fits', flags = '-SAVE_TYPE REPLACE'
-  
-  ;find zero-point
-  phast_calculate_zeropoint, msgarr
-  
-  ;report finished
-  result = dialog_message('Done!              ',/center,/information)
-  
-end
-;----------------------------------------------------------------------
-
 pro phast_combine
 
 ;routine to combine files in a directory into one master file using a
@@ -988,6 +992,36 @@ pro phast_combine_gui_event,event
 end
 ;----------------------------------------------------------------------
 
+pro phast_do_all
+
+  ;routine to automatically process an image through the entire pipeline
+
+  common phast_state
+  common phast_images
+  
+  widget_control, /hourglass
+  
+  ;run SExtractor
+  ;spawn, 'sex ' + state.imagename + ' -CATALOG_NAME phast.cat'
+  phast_do_sextractor, cat_name = 'phast.cat'
+  
+  ;run Scamp
+  ;spawn, 'scamp phast.cat'
+  phast_do_scamp,cat_name = 'phast.cat'
+  
+  ;write astrometric solution to calibrated image
+  ;spawn,'missfits phast.fits -SAVE_TYPE REPLACE'
+  phast_do_missfits, image = 'phast.fits', flags = '-SAVE_TYPE REPLACE'
+  
+  ;find zero-point
+  phast_calculate_zeropoint, msgarr
+  
+  ;report finished
+  result = dialog_message('Done!              ',/center,/information)
+end
+
+;----------------------------------------------------------------------
+
 pro phast_do_batch
 
   ;routine to batch process images.  Loads images from a give directory
@@ -1018,11 +1052,13 @@ pro phast_do_batch
   for i=0,num_files-1 do begin
     fits_read,filelist[i],cal_science,cal_science_head
     split = strsplit(filelist[i],'/\.',count=count,/extract)
-    state.cal_file_name = './output/images/'+split[count-2]+'.'+split[count-1]
+    state.cal_file_name = state.phast_dir+'/output/images/'+split[count-2]+'.'+split[count-1]
     phast_calibrate
-    phast_do_sextractor,image = state.cal_file_name,cat_name='./output/images/'+split[count-2]+'.cat'
-    phast_do_scamp,cat_name='./output/images/'+split[count-2]+'.cat'
-    phast_do_missfits, image = state.cal_file_name, flags = state.missfits_flags+' -SAVE_TYPE REPLACE'
+    if state.astrometry_toggle ne 0 then begin
+       phast_do_sextractor,image = state.cal_file_name,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
+       phast_do_scamp,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
+       phast_do_missfits, image = state.cal_file_name, flags = state.missfits_flags+' -SAVE_TYPE REPLACE'
+    endif
   endfor
   result = dialog_message('Batch processing complete!',/information,/center)
 end

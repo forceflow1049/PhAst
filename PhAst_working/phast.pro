@@ -162,6 +162,11 @@ pro phast_initcommon, phast_dir, launch_dir
     
   state = {                $
     batch_current_toggle:0L,$;widget ID for current image button
+    astrometry_toggle: 0L, $;compute astrometry using SExtractor, etc?
+    bin_x_widget: 0L, $     ;widget id for bin level text box
+    bin_y_widget: 0L, $     ;widget id for bin level text box
+    x_bin: 1, $             ;multiple to bin pixels on calibration
+    y_bin: 1, $             ;multiple to bin pixels on calibration
     batch_single_current_toggle:0L,$;widget ID for single image button
     batch_imagename: '', $  ;image to be processed
     batch_single_image_base:0L,$;base ID for batch single base

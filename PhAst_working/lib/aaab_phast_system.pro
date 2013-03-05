@@ -2143,7 +2143,10 @@ pro phast_read_config
           state.flat_toggle = 1
         end
         'overscan': begin
-          state.over_toggle = val[i]
+          state.over_toggle = fix(val[i])
+       end
+        'compute_astrometry': begin
+           state.astrometry_toggle = fix(val[i])
         end
         ;sextractor
         'sex_catalog_path': state.sex_catalog_path = val[i]
@@ -2994,15 +2997,8 @@ pro phast_startup, phast_dir, launch_dir
                   {cw_pdmenu_s, 2, 'MPC report'},$
                   {cw_pdmenu_s, 1, 'Pipeline'}, $
                   {cw_pdmenu_s, 0, 'Combine images'},$
-                  {cw_pdmenu_s, 0, 'Calibration'},$
-                  {cw_pdmenu_s, 0, '--------------'},$
-                  {cw_pdmenu_s, 0, 'SExtractor'}, $
-                  {cw_pdmenu_s, 0, 'SCAMP'}, $
-                  {cw_pdmenu_s, 0, 'missFITS'},$
-                  {cw_pdmenu_s, 0, 'Photometric zero-point'},$
-                  {cw_pdmenu_s, 0, 'Do all'}, $
-                  {cw_pdmenu_s, 0, '--------------'}, $
-                  {cw_pdmenu_s, 2, 'Batch process'}, $
+                  {cw_pdmenu_s, 0, 'Batch process'}, $
+                  {cw_pdmenu_s, 2, 'Photometric zero-point'},$
                   {cw_pdmenu_s, 1, 'Help'}, $ ; help menu
                   {cw_pdmenu_s, 0, 'PHAST Help'},$
                   {cw_pdmenu_s, 0, 'Debug info'},$                  
