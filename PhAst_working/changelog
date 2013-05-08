@@ -1,6 +1,7 @@
 New features:
 -Added ability to combine images [Morgan Rehnberg]
 -New unified callibration dialog [Morgan Rehnberg]
+-More robust installer [Morgan Rehnberg]
 Bugs fixed:
 -Fixed crash when aligning images [Morgan Rehnberg]
 -fixed crash when batch calibrating a directory [Morgan Rehnberg]
