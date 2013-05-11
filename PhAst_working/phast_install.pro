@@ -13,9 +13,47 @@ pro phast_install
   print, '################################################################################'
   print, 'Welcome to PhAst'
   print, '################################################################################'
-  if (file_test('output') eq 1) and (file_test('output/images') eq 1) and (file_test('output/catalogs') eq 1) then begin
+
+error = 0
+     while (1 eq 1)do begin
+        catch, error
+        if error ne 0 then begin
+           print, 'Error: Library not installed'
+           print, ''
+           catch, /cancel
+           break
+        endif
+        print, ""
+        print, 'Checking for installed NASA Astronomy User library...'
+        resolve_routine, 'MMM'
+        print, 'Library installed'
+        print, ''
+        break
+     endwhile
+     error2=0
+     while (1 eq 1)do begin
+        catch, error2
+        if error2 ne 0 then begin
+           print, 'Error: Library not installed or out of date'
+           print, ''
+           catch, /cancel
+           break
+        endif
+        print, 'Checking for installed Coyote Library...'
+        resolve_routine, 'CGPROGRESSBAR__DEFINE'
+        print, 'Library installed'
+        print, ''
+        break
+     endwhile
+
+if (error ne 0) or (error2 ne 0) then begin
+   install = 0
+   print, "Please configure your libraries before installing or upgrading PhAst"
+endif
+
+  if (file_test('output') eq 1) and (file_test('output/images') eq 1) and (file_test('output/catalogs') eq 1) and (install eq 1) then begin
      print, ''
-     print, 'It appears that PhAst has already been installed.  If you are upgrading from an earlier PhAst release and have already replaced the files in this directory and in lib/, no further action is required.'
+     print, 'Your libraries appear to be installed and up to date.  If you are upgrading from an earlier PhAst release and have already replaced the files in this directory and in lib/, no further action is required.'
      while (1 eq 1) do begin
         read, answer2, prompt='Continue with new installation anyway? yes/no:'
         if (answer2 eq 'No') or (answer2 eq 'no') then begin
@@ -50,35 +88,6 @@ pro phast_install
      print, 'Setting path... done.'
      print, ''
 
-     error = 0
-     while (1 eq 1)do begin
-        catch, error
-        if error ne 0 then begin
-           print, 'Error: Library not installed'
-           print, ''
-           catch, /cancel
-           break
-        endif
-        print, 'Checking for installed NASA Astronomy User library...'
-        resolve_routine, 'MMM'
-        print, 'Library installed'
-        print, ''
-        break
-     endwhile
-     error2=0
-     while (1 eq 1)do begin
-        catch, error2
-        if error2 ne 0 then begin
-           print, 'Error: Library not installed'
-           print, ''
-           catch, /cancel
-           break
-        endif
-        print, 'Checking for installed Coyote Library...'
-        resolve_routine, 'CGSET'
-        print, 'Library installed'
-        print, ''
-        break
-     endwhile
+     
   endif
 end

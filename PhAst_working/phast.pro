@@ -161,6 +161,7 @@ pro phast_initcommon, phast_dir, launch_dir
     }
     
   state = {                $
+    bin_label: 0L, $       ;widget ID for bin label warning
     batch_current_toggle:0L,$;widget ID for current image button
     astrometry_toggle: 0L, $;compute astrometry using SExtractor, etc?
     bin_x_widget: 0L, $     ;widget id for bin level text box

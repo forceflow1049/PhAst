@@ -1,5 +1,6 @@
 New features:
 -Added ability to combine images [Morgan Rehnberg]
+-Added ability to bin images [Morgan Rehnberg]
 -New unified callibration dialog [Morgan Rehnberg]
 -More robust installer [Morgan Rehnberg]
 Bugs fixed:

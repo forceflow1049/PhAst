@@ -57,11 +57,12 @@ pro phast_batch
     cal_select_box = widget_base(calibrate_base,/row)
     overscan_base = widget_base(calibrate_base,/nonexclusive,/column)
     over_correct = widget_button(overscan_base,value='Overscan correction',uvalue='over_correct')
-    ;; bin_box = widget_base(calibrate_base,/row)
-    ;; x_label = widget_label(bin_box,value='Bin x:')
-    ;; state.bin_x_widget = widget_text(bin_box,value=strtrim(string(state.x_bin),1),uvalue='bin_x_widget',xsize=5,/all_events,/editable)
-    ;; y_label = widget_label(bin_box,value='Bin y:')
-    ;; state.bin_y_widget = widget_text(bin_box,value=strtrim(string(state.y_bin),1),uvalue='bin_y_widget',xsize=5,/all_events,/editable)
+    bin_box = widget_base(calibrate_base,/row)
+    x_label = widget_label(bin_box,value='Bin x:')
+    state.bin_x_widget = widget_text(bin_box,value=strtrim(string(state.x_bin),1),uvalue='bin_x_widget',xsize=5,/all_events,/editable)
+    y_label = widget_label(bin_box,value='Bin y:')
+    state.bin_y_widget = widget_text(bin_box,value=strtrim(string(state.y_bin),1),uvalue='bin_y_widget',xsize=5,/all_events,/editable)
+    state.bin_label = widget_label(bin_box,value='',xsize=400,ysize=15)
     button_box1 = widget_base(cal_select_box,/nonexclusive,/column)
     bias_toggle = widget_button(button_box1,value='Bias',uvalue='bias_toggle')
     flat_toggle = widget_button(button_box1,value='Flat',uvalue='flat_toggle')
@@ -245,10 +246,12 @@ pro phast_batch_event,event
      'bin_x_widget': begin
         widget_control, state.bin_x_widget,get_value=value
         state.x_bin = float(value)
+        widget_control, state.bin_label,set_value='Warning: new plate scale must be set in SExtractor confiiguration.'
      end
      'bin_y_widget': begin
         widget_control, state.bin_y_widget,get_value=value
         state.y_bin = float(value)
+        widget_control, state.bin_label,set_value='Warning: new plate scale must be set in SExtractor confiiguration.'
      end    
                                 ;astrometry toggle
      'astrometry_toggle': begin
@@ -1049,18 +1052,20 @@ pro phast_do_batch
     end
  endcase
   
+  progress_bar = obj_new('cgprogressbar',title='Processing images',/start)
   for i=0,num_files-1 do begin
-    fits_read,filelist[i],cal_science,cal_science_head
-    split = strsplit(filelist[i],'/\.',count=count,/extract)
-    state.cal_file_name = state.phast_dir+'/output/images/'+split[count-2]+'.'+split[count-1]
-    phast_calibrate
-    if state.astrometry_toggle ne 0 then begin
-       phast_do_sextractor,image = state.cal_file_name,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
-       phast_do_scamp,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
-       phast_do_missfits, image = state.cal_file_name, flags = state.missfits_flags+' -SAVE_TYPE REPLACE'
-    endif
+     fits_read,filelist[i],cal_science,cal_science_head
+     split = strsplit(filelist[i],'/\.',count=count,/extract)
+     state.cal_file_name = state.phast_dir+'/output/images/'+split[count-2]+'.'+split[count-1]
+     phast_calibrate
+     if state.astrometry_toggle ne 0 then begin
+        phast_do_sextractor,image = state.cal_file_name,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
+        phast_do_scamp,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
+        phast_do_missfits, image = state.cal_file_name, flags = state.missfits_flags+' -SAVE_TYPE REPLACE'
+     endif
+     progress_bar->update,float(i)/num_files*100
   endfor
-  result = dialog_message('Batch processing complete!',/information,/center)
+  progress_bar->destroy
 end
 
 ;----------------------------------------------------------------------

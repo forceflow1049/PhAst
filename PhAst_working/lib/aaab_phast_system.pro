@@ -1948,11 +1948,16 @@ pro phast_plainfits_read, fitsloc, head, cancelled,dir=dir,refresh_index=index,r
       fits_read, fitsfile[0],main_image,head
       head = headfits(fitsfile[0])
       phast_add_image,main_image,fitsfile[0],head, newimage = newimage, /dir_add, dir_num = n_elements(fitsfile)
-      for i=1, n_elements(fitsfile)-1 do begin
-        fits_read, fitsfile[i],main_image,head
-        head = headfits(fitsfile[i])
-        phast_add_image,main_image,fitsfile[i],head, newimage = newimage,/dir_add
+      progress_bar = obj_new('cgprogressbar',title='Opening images')
+      progress_bar->start
+      file_count = n_elements(fitsfile)
+      for i=1, file_count-1 do begin
+         fits_read, fitsfile[i],main_image,head
+         head = headfits(fitsfile[i])
+         phast_add_image,main_image,fitsfile[i],head, newimage = newimage,/dir_add
+         progress_bar->update,float(i)/file_count*100
       endfor
+      progress_bar->destroy
     endif else begin
       newimage = 0 ;if empty, no new image
       result = dialog_message('Directory contains no FITS images!',/center,/error)
@@ -2997,7 +3002,7 @@ pro phast_startup, phast_dir, launch_dir
                   {cw_pdmenu_s, 2, 'MPC report'},$
                   {cw_pdmenu_s, 1, 'Pipeline'}, $
                   {cw_pdmenu_s, 0, 'Combine images'},$
-                  {cw_pdmenu_s, 0, 'Batch process'}, $
+                  {cw_pdmenu_s, 0, 'Process images'}, $
                   {cw_pdmenu_s, 2, 'Photometric zero-point'},$
                   {cw_pdmenu_s, 1, 'Help'}, $ ; help menu
                   {cw_pdmenu_s, 0, 'PHAST Help'},$
@@ -3591,7 +3596,7 @@ pro phast_topmenu_event, event
         endif else result = dialog_message('The file zeropoint.param is required for this action.  Download it from the PhAst website.',/error,/center)
      end
      'Do all': phast_do_all
-     'Batch process': phast_batch
+     'Process images': phast_batch
      
      
      ; Help options:
