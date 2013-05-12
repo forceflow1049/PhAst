@@ -268,7 +268,7 @@ pro phast_initcommon, phast_dir, launch_dir
     sex_cat_widget_id: 0L, $;widget id for the catalog input box
     sex_PHOT_AUTOPARAMS: [2.5, 0.0], $ ; kron radius controls for ZEROPOINT determination
     num_images: 0, $        ;number of images in image archive
-    version: '1.3', $       ; version # of this release
+    version: '1.4', $       ; version # of this release
     head_ptr: ptr_new(), $  ; pointer to image header
     astr_ptr: ptr_new(), $  ; pointer to astrometry info structure
     firstimage: 1, $        ; is this the first image?
