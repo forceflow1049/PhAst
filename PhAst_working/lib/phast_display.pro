@@ -771,7 +771,7 @@ pro phast_displaymain
   phast_setwindow, state.draw_window_id
   
   if state.align_toggle eq 1 then tv, display_image,offset[0],offset[1]
-  if state.align_toggle ne 1 then tv, display_image
+  if state.align_toggle ne 1 then cgimage, display_image
   phast_resetwindow
 end
 
@@ -824,6 +824,7 @@ pro phast_display_stars
               nplot++
               region_str = 'circle('+strtrim(string(x1[i]),2)+', '+strtrim(string(y1[i]),2)+', ' $
                          + circletext + ') # color=' + colorcode
+
               options = {color:colorcode,thick:fonttext}
               options.color = phast_icolor(options.color)
               pstruct = {type:'region',reg_array:[region_str],options:options}
@@ -3694,7 +3695,7 @@ end
 
 ;--------------------------------------------------------------------
 
-pro phast_settitle
+pro phast_settitle, reset=reset
 
   ; Update title bar with the image file name
 
@@ -3702,6 +3703,11 @@ pro phast_settitle
   common phast_images
   
   if (state.title_extras EQ 'firstimage') then return
+
+  if keyword_set(reset) then begin
+     widget_control, state.base_id, tlb_set_title = 'PhAst'
+     return
+  endif
   
   state.title_extras = ''
   
@@ -3715,7 +3721,7 @@ pro phast_settitle
   endif
   
   if (state.imagename EQ '') then begin
-    title = strcompress('phast: ' + state.title_extras)
+    title = strcompress('PhAst: ' + state.title_extras)
     widget_control, state.base_id, tlb_set_title = title
     
   endif else begin
@@ -3732,7 +3738,7 @@ pro phast_settitle
     slash = strpos(state.imagename, state.delimiter, /reverse_search)
     if (slash NE -1) then name = strmid(state.imagename, slash+1) $
     else name = state.imagename
-    title = strcompress('phast:  '+ name + '  ' + state.title_extras)
+    title = strcompress('PhAst:  '+ name + '  ' + state.title_extras)
     
     if (title_object NE '') then  $
       title = strcompress(title + ': ' + title_object)

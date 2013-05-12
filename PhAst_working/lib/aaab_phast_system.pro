@@ -2531,6 +2531,7 @@ pro phast_remove_image,index=index,all=all
         state.firstimage = 1
         widget_control,state.image_counter_id,set_value='Cycle images: no image loaded'
         widget_control,state.image_select_id,set_value='no image'
+        phast_settitle, /reset
         phast_base_image
      endelse
   endif else begin
@@ -2541,6 +2542,7 @@ pro phast_remove_image,index=index,all=all
      state.firstimage = 1
      widget_control,state.image_counter_id,set_value='Cycle images: no image loaded'
      widget_control,state.image_select_id,set_value='no image'
+     phast_settitle, /reset
      phast_base_image
   endelse  
 end
@@ -2877,7 +2879,7 @@ pro phast_startup, phast_dir, launch_dir
   ; Define the widgets.  For the widgets that need to be modified later
   ; on, save their widget ids in state variables
   
-  base = widget_base(title = 'phast', $
+  base = widget_base(title = 'PhAst', $
                      /row, /base_align_top, $
                      app_mbar = top_menu, $
                      uvalue = 'phast_base', $
