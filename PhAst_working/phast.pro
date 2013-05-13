@@ -45,7 +45,7 @@
 ;
 ; RESTRICTIONS:
 ;       Requires IDL version 8.0 or greater.
-;       Requires Craig Markwardt's cmps_form.pro routine.
+;       Requires the Coyote Library
 ;       Requires the GSFC IDL astronomy user's library routines.
 ;       Some features may not work under all operating systems.
 ;
@@ -58,7 +58,9 @@
 ;       the pre-existing phast window.
 ;
 ; MODIFICATION HISTORY:
-;       2012-05-10 PhAst 1.2 releas3d.
+;       2013-05-31 PhAst 1.4 released.
+;       2012-12-02 PhAst 1.3 reseased.
+;       2012-05-10 PhAst 1.2 released.
 ;       2011-11-27 PhAst 1.1 released.
 ;       2011-08-11 PhAst 1.0 released. First public release (Morgan
 ;                  Rehnberg)
