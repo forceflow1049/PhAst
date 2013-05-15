@@ -1,0 +1,9 @@
+New features:
+-Added ability to combine images [Morgan Rehnberg]
+-Added ability to bin images [Morgan Rehnberg]
+-New unified callibration dialog [Morgan Rehnberg]
+-More robust installer [Morgan Rehnberg]
+Bugs fixed:
+-Fixed crash when aligning images [Morgan Rehnberg]
+-fixed crash when batch calibrating a directory [Morgan Rehnberg]
+-fixed crash when using sextractor, etc from a directory other than the PhAst dir [Morgan Rehnberg]
