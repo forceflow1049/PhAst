@@ -415,7 +415,7 @@ pro phast_calculate_zeropoint, msgarr
                                                                              and finite(cat_ColorExt)  $
                                                                              and finite(cat_ColorTrm) )  ; reduce to surviving catalog entries
   if n_elements(good) lt n_elements(cat_ColorFit) then begin
-    index = indgen(n_elements(cat_ColorFit))
+    index = indgen(n_elements(cat_ColorFit),/ulong)
     remove, good, index ; index is now bad points
     pntrx = where(finite(cat_ColorFit),countColor)
     if countColor gt 0 then begin
@@ -430,7 +430,7 @@ pro phast_calculate_zeropoint, msgarr
     /REMOVE_ALL )
   phast_do_sextractor, image=state.imagename, flags=textstr, cat_name='./output/catalogs/zeropoint.cat'
   
-  readcol, './output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
+  readcol, state.phast_dir+'output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
   
    ; qualify SExtractor detections
   Instr( where(   flags gt  0  ) ) = !values.F_NAN  ; avoid complicated/corrupted detections

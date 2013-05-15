@@ -46,14 +46,20 @@ pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul
   endelse
   radius = state.pixelscale * sqrt( (state.image_size[0]/2)^2 + (state.image_size[1]/2)^2 ) / 60.0
   X = sxpar(*state.head_ptr,'AIRMASS')  >  0.00 ; use X=0.0 if AIRMASS not present
-  datestr = sxpar(*state.head_ptr,'DATE-OBS')
-  YYYY =  long(strmid(datestr,0,4))
-  MM =  long(strmid(datestr,5,2))
-  DD =  long(strmid(datestr,8,2))
   timestr = sxpar(*state.head_ptr,'UT')
   HH =  long(strmid(timestr,0,2))
   Min =  long(strmid(timestr,3,2))
   Sec = float(strmid(timestr,6))
+  datestr = sxpar(*state.head_ptr,'DATE-OBS',count=count)
+  if count ne 0 then begin
+     YYYY =  long(strmid(datestr,0,4))
+     MM =  long(strmid(datestr,5,2))
+     DD =  long(strmid(datestr,8,2))
+  endif else begin
+     mjd = sxpar(*state.head_ptr,'MJD-OBS',count=count)
+     if count ne 0 then daycnv, mjd, YYYY,MM,DD,HH
+  endelse
+
   datejul = JULDAY(MM,DD,YYYY,HH,Min,Sec)
   exptime = float(sxpar(*state.head_ptr,'EXPTIME'))
   datejul = datejul + 0.5*exptime/3600./24.
