@@ -163,6 +163,8 @@ pro phast_initcommon, phast_dir, launch_dir
     }
     
   state = {                $
+    tab_list: list(), $    ;holds list of current tabs
+    tab_bar_id: 0L, $      ;Widget ID for tab bar
     bin_label: 0L, $       ;widget ID for bin label warning
     batch_current_toggle:0L,$;widget ID for current image button
     astrometry_toggle: 0L, $;compute astrometry using SExtractor, etc?

@@ -264,7 +264,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   endelse
         
   ;update widgets
-  if not keyword_set(refresh_toggle) then widget_control,state.image_counter_id,set_value='Cycle images: '+ strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
+  ;if not keyword_set(refresh_toggle) then widget_control,state.image_counter_id,set_value='Cycle images: '+ strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
   
   ;format filenames for dropdown box
   short_names = strarr(state.num_images)
@@ -273,6 +273,9 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
      short_names[i] = temp[count-2]
   end
   widget_control,state.image_select_id,set_value=short_names
+
+  ;add a new tab for the image.
+  state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
 end
 
 ;-------------------------------------------------------------------
@@ -425,8 +428,9 @@ pro phast_cycle_images, direction,animate=animate
     end
     state.sex_catalog_path +='/'
     ;update widgets
-    widget_control,state.image_counter_id,set_value= counter_string
+    ;widget_control,state.image_counter_id,set_value= counter_string
     widget_control,state.image_select_id,set_droplist_select=state.current_image_index
+    widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
     phast_getstats,/align,/noerase                ;update stats based on new image
     phast_settitle                                ;update title bar with object name
     phast_displayall              ;redraw screen
@@ -1154,6 +1158,10 @@ pro phast_event, event
         endif else state.align_toggle = 0
      end
      
+     ;tab list
+     'tab_list': phast_image_switch,event.tab
+        
+     
      else:  print, 'No match for uvalue....' ; bad news if this happens
   endcase
   widget_control, state.draw_base_id, /input_focus
@@ -1391,9 +1399,10 @@ pro phast_image_switch, index
     main_image = image_archive[state.current_image_index]->get_image()
     state.imagename  = image_archive[state.current_image_index]->get_name()
     phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-    counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
-    ;update widgets
-    widget_control,state.image_counter_id,set_value= counter_string
+    ;; counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
+    ;; ;update widgets
+    ;; widget_control,state.image_counter_id,set_value= counter_string
+    widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
     phast_getstats,/align,/noerase                ;update stats based on new image
     phast_settitle                                ;update title bar with object name
     phast_displayall            ;redraw screen
@@ -2495,6 +2504,7 @@ pro phast_remove_image,index=index,all=all
   common phast_images
   if not keyword_set(all) then begin
      obj_destroy, image_archive[index]
+     widget_control, state.tab_list.remove(index),/destroy
      if state.num_images gt 1 then begin
         temp_image = objarr(state.num_images-1)
         j=0
@@ -2529,18 +2539,21 @@ pro phast_remove_image,index=index,all=all
         state.current_image_index = 0
         state.catalog_loaded = 0
         state.firstimage = 1
-        widget_control,state.image_counter_id,set_value='Cycle images: no image loaded'
+        ;widget_control,state.image_counter_id,set_value='Cycle images: no image loaded'
         widget_control,state.image_select_id,set_value='no image'
         phast_settitle, /reset
         phast_base_image
      endelse
   endif else begin
-     for i=0,state.num_images-1 do obj_destroy,image_archive[i]
+     for i=0,state.num_images-1 do begin
+        obj_destroy,image_archive[i]
+        widget_control, state.tab_list.remove(index),/destroy
+     endfor
      state.num_images = 0
      state.current_image_index = 0
      state.catalog_loaded = 0
      state.firstimage = 1
-     widget_control,state.image_counter_id,set_value='Cycle images: no image loaded'
+     ;widget_control,state.image_counter_id,set_value='Cycle images: no image loaded'
      widget_control,state.image_select_id,set_value='no image'
      phast_settitle, /reset
      phast_base_image
@@ -3026,31 +3039,23 @@ pro phast_startup, phast_dir, launch_dir
                                        uvalue = 'colorbar_base', $
                                        /column, /base_align_center, $
                                        frame = 2,xsize=250)
-  
-          
-  image_switch_base = widget_base(left_pane,/column,xsize=250,frame=4,/base_align_center)
-  image_switch_row1 = widget_base(image_switch_base,/row)
-  cycle_image_label = widget_label(image_switch_row1,value="Cycle images: no image loaded",/align_left)
-  image_switch_sub = widget_base(image_switch_base,/row)
-  left_button = widget_button(image_switch_sub,value='<---',uvalue='left_button',$
-                              tooltip='Previous image')
-  right_button = widget_button(image_switch_sub,value='--->', uvalue='right_button',$
-                               tooltip='Next image')
-  image_select_box = widget_droplist(image_switch_sub,value='no image',/dynamic_resize,uvalue='image_select_box')
-  
-  toggle_buttonbox = widget_base(image_switch_row1,/row,/nonexclusive)
-  
-  state.align_toggle_button = widget_button(toggle_buttonbox,value='Align',uvalue='align_toggle',$
-                               tooltip='Align images using WCS coordinates')
-  
-  state.image_counter_id = cycle_image_label
-  state.image_select_id = image_select_box
+
   
   state.info_base_id = widget_base(left_pane, /column,frame=4,xsize=250,/base_align_center)
   buttonbar_base = widget_base(left_pane, column=3,xsize=250,frame=4,/base_align_center)
   
-        
-  state.draw_base_id = widget_base(base, $
+  right_pane = widget_base(base,/column,/base_align_left)
+  right_top_box = widget_base(right_pane,/row,/base_align_bottom)
+  ;; state.image_counter_id = widget_label(counter_box,value="Cycle images: no image loaded",/align_left)
+  state.image_select_id = widget_droplist(right_top_box,value='no image',/dynamic_resize,uvalue='image_select_box')
+  left_button = widget_button(right_top_box,value='<---',uvalue='left_button',$
+                              tooltip='Previous image')
+  right_button = widget_button(right_top_box,value='--->', uvalue='right_button',$
+                               tooltip='Next image')
+  state.tab_bar_id = widget_tab(right_top_box,xsize=500,uvalue='tab_list')
+  align_toggle_box = widget_base(right_top_box,/nonexclusive)
+  state.align_toggle_button = widget_button(align_toggle_box,value='Align images',uvalue='align_toggle',tooltip='Align images using WCS coordinates')
+  state.draw_base_id = widget_base(right_pane, $
                                    /column, /base_align_center, $
                                    uvalue = 'draw_base', $
                                    frame = 2)
@@ -3101,13 +3106,10 @@ pro phast_startup, phast_dir, launch_dir
   modebase = widget_base(buttonbar_base, /column, /base_align_center)
   mode_label = widget_label(modebase,value='Mouse Mode')
   modelist = ['Color', 'Zoom', 'Blink', 'ImExam', 'Vector','Label']
-  mode_droplist_id = widget_droplist(modebase, $
+  state.mode_droplist_id = widget_droplist(modebase, $
                                      uvalue = 'mode', $
                                      value = modelist)
-  widget_control,mode_droplist_id,set_droplist_select=3
-  
-  state.mode_droplist_id = mode_droplist_id
-  
+  widget_control,state.mode_droplist_id,set_droplist_select=3  
   
   button_base1 = widget_base(buttonbar_base, /column,/base_align_center)
   button_base2 = widget_base(buttonbar_base, /column,/base_align_center)
