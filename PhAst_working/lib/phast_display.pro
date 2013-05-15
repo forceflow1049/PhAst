@@ -771,7 +771,7 @@ pro phast_displaymain
   phast_setwindow, state.draw_window_id
   
   if state.align_toggle eq 1 then tv, display_image,offset[0],offset[1]
-  if state.align_toggle ne 1 then cgimage, display_image
+  if state.align_toggle ne 1 then tv, display_image
   phast_resetwindow
 end
 
