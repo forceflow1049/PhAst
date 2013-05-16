@@ -8,7 +8,7 @@
 ; CALLING SEQUENCE:
 ;       phast [,array_name OR fits_file] [,min = min_value] [,max=max_value]
 ;           [,/linear] [,/log] [,/histeq] [,/asinh] [,/block]
-;           [,/align] [,/stretch] [,header = header]
+;           [,/align] [,/stretch] [,header = header] [,/small]
 ;
 ; REQUIRED INPUTS:
 ;       None.  If phast is run with no inputs, the window widgets
@@ -31,6 +31,7 @@
 ;       align:      align image with previously displayed image
 ;       stretch:    keep same min and max as previous image
 ;       header:     FITS image header (string array) for use with data array
+;       small:      Collapse all toolboxes initially.  For small screens
 ;
 ; OUTPUTS:
 ;       None.
@@ -50,9 +51,9 @@
 ;       Some features may not work under all operating systems.
 ;
 ; EXAMPLE:
-;       To start phast running, just enter the command 'phast' at the idl
+;       To start PhAst running, just enter the command 'phast' at the idl
 ;       prompt, either with or without an array name or fits file name
-;       as an input.  Only one phast window will be created at a time,
+;       as an input.  Only one PhAst window will be created at a time,
 ;       so if one already exists and another image is passed to phast
 ;       from the idl command line, the new image will be displayed in
 ;       the pre-existing phast window.
@@ -73,7 +74,7 @@
 
 ;----------------------------------------------------------------------
 
-pro phast_initcommon, phast_dir, launch_dir
+pro phast_initcommon, phast_dir, launch_dir, small
 
   ; Routine to initialize the phast common blocks.  Use common blocks so
   ; that other IDL programs can access the phast internal data easily.
@@ -144,7 +145,7 @@ pro phast_initcommon, phast_dir, launch_dir
     contact_name:'', $      ;MPC contact name
     contact_email:'',$      ;MPC contact email
     contact_address:'',$    ;MPC contact address
-    code: '', $              ;single char MPC code
+    code: '', $             ;single char MPC code
     name_box: 0L, $         ;widget id for contact name box
     address_box: 0L, $      ;widget id for contact address box
     email_box: 0L,$         ;widget id for contact email box
@@ -152,17 +153,26 @@ pro phast_initcommon, phast_dir, launch_dir
     measurer_box: 0L, $     ;widget id for measurer box
     code_box: 0L, $         ;widget it for code box
     tel_box: 0L, $          ;widget id for tel box
-    lat_north: 0L, $         ;widget it for lat north button
-    lat_south: 0L, $         ;widget it for lat south  button
+    lat_north: 0L, $        ;widget it for lat north button
+    lat_south: 0L, $        ;widget it for lat south  button
     lat_box: 0L, $          ;widget id for lat box
     lon_west: 0L, $         ;widget it for lon west button
     lon_east: 0L, $         ;widget it for lon east button
     lon_box: 0L, $          ;widget id for lon box
     height_box: 0L, $       ;widget id for height box
-    site_code_text: 0L $   ;widget id for site code box
+    site_code_text: 0L $    ;widget id for site code box
     }
     
   state = {                $
+    batch_astrometry_toggle_state:1,$;is batch astro base visible?
+    batch_astrometry_base:0L,$;Widget ID of batch astrometry base
+    batch_astrometry_toggle:0L,$;button to show/hide batch astro settings
+    batch_calibrate_base:0L,$;Widget ID of batch cal base
+    batch_cal_toggle_state:1,$;is the batch cal base showing?
+    batch_cal_toggle:0L, $ ;button to show/hide batch image settings
+    batch_image_toggle_state:1,$;is the batch image base showing?
+    batch_image_base:0L, $ ;Widget ID of batch image base
+    batch_image_toggle:0L,$;button to show/hide batch image settings
     tab_list: list(), $    ;holds list of current tabs
     tab_bar_id: 0L, $      ;Widget ID for tab bar
     bin_label: 0L, $       ;widget ID for bin label warning
@@ -237,8 +247,10 @@ pro phast_initcommon, phast_dir, launch_dir
     zeropoint_image_name:'',$;holds image to calculate zeropoint for
     missfits_image_name:'',$;path to image for missfits to use
     missfits_image_widget_id:0L,$;widget it for missfits image label
+    swarp_flags_widget_id:0L,$;widget ID for swarp flags box      
     missfits_flags: '', $   ;string to hold flag list for missfits
     scamp_flags: '', $      ;string to hold flag list for scamp
+    swarp_flags: '', $      ;string to hold flag list for swarp
     sex_flags: '', $        ;string to hold flag list for sextractor
     missfits_flags_widget_id: 0L,$;widget id for missfits flags box
     scamp_flags_widget_id: 0L,$;widget id for scamp flags box
@@ -539,6 +551,19 @@ pro phast_initcommon, phast_dir, launch_dir
   
   phast_read_config ;read configuration file and set variables as specified
   phast_read_filters ;read filters file to define passbands
+
+  ;if /small keyword set, collapse toolboxes to start.
+  ;this overrides the config file
+  if small eq 1 then begin
+     state.batch_astrometry_toggle_state = 0
+     state.batch_image_toggle_state = 0
+     state.batch_cal_toggle_state = 0
+     state.tb_overlay_toggle = 0
+     state.tb_spice_toggle = 0
+     state.tb_blink_toggle = 0
+     state.draw_window_size[1] = 450L
+  endif
+
   if state.check_updates eq 1 then phast_check_updates,/silent
 end
 
@@ -585,15 +610,18 @@ pro phast, image, $
     block = block, $
     align = align, $
     stretch = stretch, $
-    header = header
+    header = header, $
+    small = small
 
   common phast_state
   common phast_images
   
-  if (long(strmid(!version.release,0,1)) LT 6) then begin
-    print, 'PHAST requires IDL version 6.0 or greater.'
+  if (long(strmid(!version.release,0,1)) LT 8) then begin
+    print, 'PHAST requires IDL version 8.0 or greater.'
     retall
-  endif
+ endif
+
+  if not keyword_set(small) then small = 0
   
   if (not(keyword_set(block))) then block = 0 else block = 1
 
@@ -628,7 +656,7 @@ pro phast, image, $
   ; this routine.
   if (not (xregistered('phast', /noshow))) then begin
     userwindow = !d.window
-    phast_startup, phast_dir, launch_dir
+    phast_startup, phast_dir, launch_dir, small
     align = 0B     ; align, stretch keywords make no sense if we are
     stretch = 0B   ; just starting up.
     

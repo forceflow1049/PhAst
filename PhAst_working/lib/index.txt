@@ -44,14 +44,20 @@ phast_system: contains common blocks and archives and basic routines
      phast_image::get_catalog_type
      phast_image::get_header
      phast_image::get_image
+     phast_image::get_max_stretch
+     phast_image::get_min_stretch
      phast_image::get_name
      phast_image::get_rotation
      phast_image::get_size
      phast_image::init
      phast_image::set_astr
-     phast_image::get_catalog
+     phast_image::set_brightness
+     phast_image::set_catalog
+     phast_image::set_contrast
      phast_image::set_header
      phast_image::set_image
+     phast_image::set_max_stretch
+     phast_image::set_min_stretch
      phast_image::set_name
      phast_image:set_rotation
      phast_initcube
@@ -215,6 +221,7 @@ phast_pipeline: procedures for image processing
      phast_do_missfits
      phast_do_scamp
      phast_do_sextractor
+     phast_do_swarp
      phast_missfits
      phast_missfits_event
      phast_scamp

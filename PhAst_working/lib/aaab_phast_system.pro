@@ -276,6 +276,8 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
 
   ;add a new tab for the image.
   state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
+  ;remove the 'no images loaded' tab, if present
+  if (state.num_images eq 1) and (n_elements(state.tab_list) gt 1) then widget_control,state.tab_list.remove(0),/destroy
 end
 
 ;-------------------------------------------------------------------
@@ -359,82 +361,89 @@ pro phast_cycle_images, direction,animate=animate
 
   common phast_state
   common phast_images
-  
+
+  ;save current stretch settings
+  ;; image_archive[state.current_image_index]->set_contrast, state.contrast
+  ;; image_archive[state.current_image_index]->set_brightness, state.brightness
+ 
   if state.num_images gt 1 then begin
-    if not keyword_set(animate) then begin
-      if direction eq -1 and  state.current_image_index ne 0 then state.current_image_index--
-      if direction eq 1 and state.current_image_index ne state.num_images-1 then state.current_image_index++
-    endif else begin ;deal with animation type
-      case state.animate_type of
-        'forward': begin
-        
-          if direction eq -1 then begin
-            if state.current_image_index ne 0 then begin
-              state.current_image_index--
-            endif else state.current_image_index = state.num_images-1
-          endif
-          if direction eq 1 then begin
-            if state.current_image_index ne state.num_images-1 then begin
-              state.current_image_index++
-            endif else state.current_image_index = 0
-          endif
+     if not keyword_set(animate) then begin
+        if direction eq -1 and  state.current_image_index ne 0 then state.current_image_index--
+        if direction eq 1 and state.current_image_index ne state.num_images-1 then state.current_image_index++
+     endif else begin           ;deal with animation type
+        case state.animate_type of
+           'forward': begin
+              
+              if direction eq -1 then begin
+                 if state.current_image_index ne 0 then begin
+                    state.current_image_index--
+                 endif else state.current_image_index = state.num_images-1
+              endif
+              if direction eq 1 then begin
+                 if state.current_image_index ne state.num_images-1 then begin
+                    state.current_image_index++
+                 endif else state.current_image_index = 0
+              endif
+           end
+           
+           'backward': begin
+              
+              if direction eq 1 then begin
+                 if state.current_image_index ne 0 then begin
+                    state.current_image_index--
+                 endif else state.current_image_index = state.num_images-1
+              endif
+              if direction eq -1 then begin
+                 if state.current_image_index ne state.num_images-1 then begin
+                    state.current_image_index++
+                 endif else state.current_image_index = 0
+              endif
+           end
+           
+           'bounce': begin
+              if state.bounce_direction eq 1 then begin
+                 if state.current_image_index ne state.num_images-1 then begin
+                    state.current_image_index++
+                 endif else state.bounce_direction = -1
+              endif
+              if state.bounce_direction eq -1 then begin
+                 if state.current_image_index ne 0 then begin
+                    state.current_image_index--
+                 endif else begin
+                    state.current_image_index++
+                    state.bounce_direction = 1
+                 endelse
+              endif
+              
+              
+           end
+           
         end
-        
-        'backward': begin
-        
-          if direction eq 1 then begin
-            if state.current_image_index ne 0 then begin
-              state.current_image_index--
-            endif else state.current_image_index = state.num_images-1
-          endif
-          if direction eq -1 then begin
-            if state.current_image_index ne state.num_images-1 then begin
-              state.current_image_index++
-            endif else state.current_image_index = 0
-          endif
-        end
-        
-        'bounce': begin
-          if state.bounce_direction eq 1 then begin
-            if state.current_image_index ne state.num_images-1 then begin
-              state.current_image_index++
-            endif else state.bounce_direction = -1
-          endif
-          if state.bounce_direction eq -1 then begin
-            if state.current_image_index ne 0 then begin
-              state.current_image_index--
-            endif else begin
-              state.current_image_index++
-              state.bounce_direction = 1
-            endelse
-          endif
-          
-          
-        end
-        
-      end
-    end
-    
-    
-    main_image = image_archive[state.current_image_index]->get_image()
-    state.imagename  = image_archive[state.current_image_index]->get_name()
-    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-    counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
-    temp = strsplit(image_archive[state.current_image_index]->get_name(),'/\',count=count,/extract)
-    state.sex_catalog_path = ""
-    for i=0,count-2 do begin
-      state.sex_catalog_path += '/'
-      state.sex_catalog_path += temp[i]
-    end
-    state.sex_catalog_path +='/'
+     end
+     
+     
+     main_image = image_archive[state.current_image_index]->get_image()
+     state.imagename  = image_archive[state.current_image_index]->get_name()
+     phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+     ;get new stretch settings
+     ;; state.brightness = image_archive[state.current_image_index]->get_brightness()
+     ;; state.contrast = image_archive[state.current_image_index]->get_contrast()  
+     counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
+     temp = strsplit(image_archive[state.current_image_index]->get_name(),'/\',count=count,/extract)
+     state.sex_catalog_path = ""
+     for i=0,count-2 do begin
+        state.sex_catalog_path += '/'
+        state.sex_catalog_path += temp[i]
+     end
+     state.sex_catalog_path +='/'
     ;update widgets
     ;widget_control,state.image_counter_id,set_value= counter_string
-    widget_control,state.image_select_id,set_droplist_select=state.current_image_index
-    widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
-    phast_getstats,/align,/noerase                ;update stats based on new image
-    phast_settitle                                ;update title bar with object name
-    phast_displayall              ;redraw screen
-  ; phast_refresh
+     widget_control,state.image_select_id,set_droplist_select=state.current_image_index
+     widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
+     phast_getstats,/align,/noerase ;update stats based on new image
+     phast_settitle                 ;update title bar with object name
+     phast_displayall               ;redraw screen
+                                ; phast_refresh
   end
 end
 
@@ -1395,17 +1404,25 @@ pro phast_image_switch, index
   common phast_state
   common phast_images
   if state.num_images gt 0 then begin
-    state.current_image_index = index
-    main_image = image_archive[state.current_image_index]->get_image()
-    state.imagename  = image_archive[state.current_image_index]->get_name()
-    phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-    ;; counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
-    ;; ;update widgets
-    ;; widget_control,state.image_counter_id,set_value= counter_string
-    widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
-    phast_getstats,/align,/noerase                ;update stats based on new image
-    phast_settitle                                ;update title bar with object name
-    phast_displayall            ;redraw screen
+     ;save current stretch settings
+     ;; image_archive[state.current_image_index]->set_min_stretch, state.min_value
+     ;; image_archive[state.current_image_index]->set_max_stretch, state.max_value
+     state.current_image_index = index
+     main_image = image_archive[state.current_image_index]->get_image()
+     state.imagename  = image_archive[state.current_image_index]->get_name()
+     phast_setheader, image_archive[state.current_image_index]->get_header(/string)
+     ;get new stretch settings
+     ;; state.min_value = image_archive[state.current_image_index]->get_min_stretch()
+     ;; state.max_value = image_archive[state.current_image_index]->get_max_stretch()
+     ;; phast_set_minmax
+
+     ;; counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
+     ;; ;update widgets
+     ;; widget_control,state.image_counter_id,set_value= counter_string
+     widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
+     phast_getstats,/align,/noerase ;update stats based on new image
+     phast_settitle                 ;update title bar with object name
+     phast_displayall               ;redraw screen
   end
 end
 
@@ -1424,7 +1441,9 @@ pro phast_image__define
             name:ptr_new(),$    ;holds the file path to the image
             size:ptr_new(),$    ;contains the size of the image: [x,y]
             astr:ptr_new(),$    ;holds astrometry data, if available
-            rotation:ptr_new()$ ;holds rotation state of image in deg
+            rotation:ptr_new(),$;holds rotation state of image in deg
+            min_stretch:ptr_new(),$;holds the stretch min for the image
+            max_stretch:ptr_new()$ ;holds the stretch max for the iamge
            }
 end
 
@@ -1465,6 +1484,8 @@ pro phast_image::Cleanup
   ptr_free,self.size
   ptr_free,self.rotation
   ptr_free,self.astr
+  ptr_free, self.min_stretch
+  ptr_free, self.max_stretch
 end
 
 ;----------------------------------------------------------------------
@@ -1516,6 +1537,33 @@ end
 
 ;----------------------------------------------------------------------
 
+function phast_image::get_max_stretch
+
+;routine to resturn stretch max from image object
+
+  return, *(self.max_stretch)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_min_stretch
+  
+;routine to get stretch min from image object
+  
+  return, *(self.min_stretch)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_name
+  
+;routine to get image name from image object
+  
+  return, *(self.name)
+end
+
+;----------------------------------------------------------------------
+
 function phast_image::get_rotation
   
 ;routine to get image rotation state in degrees
@@ -1537,15 +1585,6 @@ end
 
 ;----------------------------------------------------------------------
 
-function phast_image::get_name
-  
-;routine to get image name from image object
-  
-  return, *(self.name)
-end
-
-;----------------------------------------------------------------------
-
 function phast_image::init
   
 ;constructor for image class
@@ -1558,6 +1597,8 @@ function phast_image::init
   self.name = ptr_new(/allocate)
   self.size = ptr_new(/allocate)
   self.rotation = ptr_new(/allocate)
+  self.max_stretch = ptr_new(/allocate)
+  self.min_stretch = ptr_new(/allocate)
   self.astr = ptr_new()  ;this will be allocated when astrometry data is present
   return,1
 end
@@ -1612,6 +1653,27 @@ pro phast_image::set_image, image
   *(self.image) = image
   image_size= size(image)
   *(self.size) = [image_size[2],image_size[3]]
+  *(self.min_stretch) = min(image) > 0
+  *(self.max_stretch) = max(image)
+  
+end
+
+;----------------------------------------------------------------------
+
+pro phast_image::set_max_stretch, c
+  
+;routine to set the contrast stretch for the image
+  
+  *(self.max_stretch) = c
+end
+
+;----------------------------------------------------------------------
+
+pro phast_image::set_min_stretch, b
+  
+;routine to set the min stretch for the image
+  
+  *(self.min_stretch) = b
 end
 
 ;----------------------------------------------------------------------
@@ -2504,6 +2566,7 @@ pro phast_remove_image,index=index,all=all
   common phast_images
   if not keyword_set(all) then begin
      obj_destroy, image_archive[index]
+     if state.num_images eq 1 then state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
      widget_control, state.tab_list.remove(index),/destroy
      if state.num_images gt 1 then begin
         temp_image = objarr(state.num_images-1)
@@ -2545,9 +2608,10 @@ pro phast_remove_image,index=index,all=all
         phast_base_image
      endelse
   endif else begin
+     state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
      for i=0,state.num_images-1 do begin
         obj_destroy,image_archive[i]
-        widget_control, state.tab_list.remove(index),/destroy
+        widget_control, state.tab_list.remove(0),/destroy
      endfor
      state.num_images = 0
      state.current_image_index = 0
@@ -2821,7 +2885,7 @@ end
 
 ;---------------------------------------------------------------------
 
-pro phast_startup, phast_dir, launch_dir
+pro phast_startup, phast_dir, launch_dir, small
 
 ; This routine initializes the phast internal variables, and creates and
 ; realizes the window widgets.  It is only called by the phast main
@@ -2837,15 +2901,17 @@ pro phast_startup, phast_dir, launch_dir
   ; As a bare minimum, we need the 8 basic colors used by PHAST_ICOLOR(),
   ; plus 2 more for a color map.
         
-  ;loadct, 0, /silent
+                                ;loadct, 0, /silent
   if (!d.table_size LT 12) then begin
      message, 'Too few colors available for color table'
      tvlct, user_r, user_g, user_b
      phast_shutdown
   endif
-        
+  
   ; Initialize the common blocks
-  phast_initcommon, phast_dir, launch_dir
+  phast_initcommon, phast_dir, launch_dir, small
+  
+
         
   state.active_window_pmulti = !p.multi
   !p.multi = 0
@@ -3053,6 +3119,7 @@ pro phast_startup, phast_dir, launch_dir
   right_button = widget_button(right_top_box,value='--->', uvalue='right_button',$
                                tooltip='Next image')
   state.tab_bar_id = widget_tab(right_top_box,xsize=500,uvalue='tab_list')
+  state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
   align_toggle_box = widget_base(right_top_box,/nonexclusive)
   state.align_toggle_button = widget_button(align_toggle_box,value='Align images',uvalue='align_toggle',tooltip='Align images using WCS coordinates')
   state.draw_base_id = widget_base(right_pane, $

@@ -17,26 +17,30 @@ pro phast_batch
       title = 'Process FITS files', $
       uvalue = 'batch_base')
       
-    image_label = widget_label(batch_base,value='Select images')
-    image_base  = widget_base(batch_base,frame=4,/column,xsize=600)
-    cal_label = widget_label(batch_base,value='Calibration settings')
-    calibrate_base = widget_base(batch_base,frame=4,/column,xsize=600)
-    astrometry_toggle_box = widget_base(batch_base,/nonexclusive)
-    astrometry_toggle = widget_button(astrometry_toggle_box,value='Compute astrometry:',uvalue='astrometry_toggle')
-    sex_label = widget_label(batch_base,value='SExtractor settings')
-    sextractor_base = widget_base(batch_base,frame=4,/row,xsize=600)
-    scamp_label = widget_label(batch_base,value='SCAMP settings')
-    scamp_base = widget_base(batch_base,frame=4,/row,xsize=600)
-    missfits_label = widget_label(batch_base,value='missFITS settings')
-    missfits_base = widget_base(batch_base,frame=4,/row,xsize=600)
+    state.batch_image_toggle = widget_button(batch_base,value='Select images',uvalue='batch_image_toggle')
+    state.batch_image_base  = widget_base(batch_base,frame=4,/column,xsize=600,ysize=160)
+    state.batch_cal_toggle = widget_button(batch_base,value='Calibration settings',uvalue='batch_cal_toggle')
+    state.batch_calibrate_base = widget_base(batch_base,frame=4,/column,xsize=600,ysize=170)
+    state.batch_astrometry_toggle = widget_button(batch_base,value='Astrometry settings',uvalue='batch_astrometry_toggle')
+    state.batch_astrometry_base = widget_base(batch_base,frame=4,/column,xsize=600,ysize=300)
+    astrometry_choice_box = widget_base(state.batch_astrometry_base,/nonexclusive)
+    astrometry_choice = widget_button(astrometry_choice_box,value='Compute astrometry',uvalue='astrometry_choice')
+    sex_label = widget_label(state.batch_astrometry_base,value='SExtractor settings')
+    sextractor_base = widget_base(state.batch_astrometry_base,frame=4,/row,xsize=600)
+    scamp_label = widget_label(state.batch_astrometry_base,value='SCAMP settings')
+    scamp_base = widget_base(state.batch_astrometry_base,frame=4,/row,xsize=600)
+    missfits_label = widget_label(state.batch_astrometry_base,value='missFITS settings')
+    missfits_base = widget_base(state.batch_astrometry_base,frame=4,/row,xsize=600)
+    swarp_label = widget_label(state.batch_astrometry_base,value='SWarp settings')
+    swarp_base = widget_base(state.batch_astrometry_base,frame=4,/row,xsize=600)
     
     ;image base
-    number_select_base = widget_base(image_base,/exclusive,/column)
+    number_select_base = widget_base(state.batch_image_base,/exclusive,/column)
     multi_image_toggle = widget_button(number_select_base,value='Process multiple images', uvalue='multi_image_toggle')
     single_image_toggle = widget_button(number_select_base,value='Process a single image', uvalue='single_image_toggle')
-    line = widget_label(image_base, value='-------------------------------------------------------------------------------------------------')
+    line = widget_label(state.batch_image_base, value='-------------------------------------------------------------------------------------------------')
 
-    state.batch_multi_image_base = widget_base(image_base,/row)
+    state.batch_multi_image_base = widget_base(state.batch_image_base,/row)
     image_toggles = widget_base(state.batch_multi_image_base,/row,/exclusive)
     state.batch_current_toggle = widget_button(image_toggles,value='Current images',uvalue='current_toggle')
     dir_toggle = widget_button(image_toggles,value='Directory',uvalue='dir_toggle')
@@ -44,7 +48,7 @@ pro phast_batch
     state.batch_select_dir = widget_button(dirname_base,value='Select directory',uvalue='select_dir',sensitive=0)
     state.batch_dir_id = widget_label(dirname_base,value=' No directory selected',/dynamic_resize,sensitive=0)
 
-    state.batch_single_image_base = widget_base(image_base,/row,sensitive=0)
+    state.batch_single_image_base = widget_base(state.batch_image_base,/row,sensitive=0)
     image_toggles = widget_base(state.batch_single_image_base,/row,/exclusive)
     state.batch_single_current_toggle = widget_button(image_toggles,value='Current image',uvalue='single_current_toggle')
     ext_toggle = widget_button(image_toggles,value='External image',uvalue='external_toggle')
@@ -54,10 +58,10 @@ pro phast_batch
 
     
     ;calibrate base
-    cal_select_box = widget_base(calibrate_base,/row)
-    overscan_base = widget_base(calibrate_base,/nonexclusive,/column)
+    cal_select_box = widget_base(state.batch_calibrate_base,/row)
+    overscan_base = widget_base(state.batch_calibrate_base,/nonexclusive,/column)
     over_correct = widget_button(overscan_base,value='Overscan correction',uvalue='over_correct')
-    bin_box = widget_base(calibrate_base,/row)
+    bin_box = widget_base(state.batch_calibrate_base,/row)
     x_label = widget_label(bin_box,value='Bin x:')
     state.bin_x_widget = widget_text(bin_box,value=strtrim(string(state.x_bin),1),uvalue='bin_x_widget',xsize=5,/all_events,/editable)
     y_label = widget_label(bin_box,value='Bin y:')
@@ -91,6 +95,10 @@ pro phast_batch
     ;missFITS base
     missfits_flags_label = widget_label(missfits_base,value='Flags:')
     state.missfits_flags_widget_id = widget_text(missfits_base,value=state.missfits_flags,uvalue='missfits_flags',xsize=50,/all_events,/editable)
+
+    ;SWarp base
+    swarp_flags_label = widget_label(swarp_base,value='Flags:')
+    state.swarp_flags_widget_id = widget_text(swarp_base,value=state.swarp_flags,uvalue='swarp_flags',xsize=50,/all_events,/editable)
     
     tmp_base = widget_base(batch_base,/row)
     start = widget_button(tmp_base,value='Start',uvalue='start')
@@ -117,7 +125,10 @@ pro phast_batch
       widget_control,state.flat_select_id,sensitive=1
     end
     if state.over_toggle eq 1 then widget_control,over_correct,set_button=1
-    if state.astrometry_toggle eq 1 then widget_control,astrometry_toggle,set_button=1
+    if state.astrometry_toggle eq 1 then widget_control,astrometry_choice,set_button=1
+    if state.batch_image_toggle_state eq 0 then widget_control,state.batch_image_base, ysize=1
+    if state.batch_cal_toggle_state eq 0 then widget_control,state.batch_calibrate_base, ysize=1
+    if state.batch_astrometry_toggle_state eq 0 then widget_control,state.batch_astrometry_base, ysize=1
     
     phast_resetwindow
   endif
@@ -137,6 +148,20 @@ pro phast_batch_event,event
   case uvalue of
   
     ;image base
+     'batch_image_toggle': begin
+        while (1 eq 1) do begin ;choose one
+           if state.batch_image_toggle_state eq 1 then begin
+              widget_control, state.batch_image_base,ysize=1
+              state.batch_image_toggle_state = 0
+              break
+           endif
+           if state.batch_image_toggle_state eq 0 then begin
+              widget_control, state.batch_image_base,ysize=160
+              state.batch_image_toggle_state = 1
+              break
+           endif
+        endwhile
+     end
      'multi_image_toggle': begin
         widget_control, state.batch_multi_image_base, sensitive=1
         widget_control, state.batch_single_image_base, sensitive=0
@@ -149,6 +174,21 @@ pro phast_batch_event,event
         widget_control, state.batch_single_current_toggle, set_button=1
         state.batch_source = 2
         
+     end
+     ;calibrate base
+     'batch_cal_toggle': begin
+        while (1 eq 1) do begin ;choose one
+           if state.batch_cal_toggle_state eq 1 then begin
+              widget_control, state.batch_calibrate_base,ysize=1
+              state.batch_cal_toggle_state = 0
+              break
+           endif
+           if state.batch_cal_toggle_state eq 0 then begin
+              widget_control, state.batch_calibrate_base,ysize=170
+              state.batch_cal_toggle_state = 1
+              break
+           endif
+        endwhile
      end
      'dark_toggle': begin
         if state.dark_toggle eq 0 then begin
@@ -253,8 +293,23 @@ pro phast_batch_event,event
         state.y_bin = float(value)
         widget_control, state.bin_label,set_value='Warning: new plate scale must be set in SExtractor confiiguration.'
      end    
-                                ;astrometry toggle
-     'astrometry_toggle': begin
+     ;astrometry base
+     'batch_astrometry_toggle': begin
+        while (1 eq 1) do begin ;choose one
+           if state.batch_astrometry_toggle_state eq 1 then begin
+              widget_control, state.batch_astrometry_base,ysize=1
+              state.batch_astrometry_toggle_state = 0
+              break
+           endif
+           if state.batch_astrometry_toggle_state eq 0 then begin
+              widget_control, state.batch_astrometry_base,ysize=300
+              state.batch_astrometry_toggle_state = 1
+              break
+           endif
+        endwhile
+     end
+                                ;compute astrometry?
+     'astrometry_choice': begin
         if state.astrometry_toggle eq 0 then begin
            state.astrometry_toggle = 1
         endif else begin
@@ -277,6 +332,12 @@ pro phast_batch_event,event
      'missfits_flags': begin
         widget_control,state.missfits_flags_widget_id,get_value=value
         state.missfits_flags = value
+     end
+
+                                ;SWarp base
+     'swarp_flags': begin
+        widget_control,state.swarp_flags_widget_id,get_value=value
+        state.swarp_flags = value
      end
      
                                 ;other
@@ -1080,7 +1141,6 @@ pro phast_do_missfits,image = image, flags = flags
   if not keyword_set(image) then image = state.imagename
 
   cd, state.phast_dir
-  widget_control,/hourglass
   spawn,'missfits ' + image + ' ' + flags
   cd, state.launch_dir
 end
@@ -1089,13 +1149,14 @@ end
 
 pro phast_do_scamp, cat_name = cat_name, flags = flags
 
+  ;routine to call external package SCAMP to generate an astrometric solution from a given SExtractor catalog
+
   common phast_state
   
   if not keyword_set(cat_name) then cat_name = state.scamp_catalog_name
   if not keyword_set(flags) then flags = ''
   
   cd, state.phast_dir
-  widget_control,/hourglass
   spawn, 'scamp ' + cat_name + flags
   cd, state.launch_dir
 end
@@ -1103,6 +1164,8 @@ end
 ;----------------------------------------------------------------------
 
 pro phast_do_sextractor,image = image, flags = flags, cat_name = cat_name
+
+  ;routine to call external package SExtractor to find sources in the image.
 
   common phast_state
   common phast_images
@@ -1112,9 +1175,26 @@ pro phast_do_sextractor,image = image, flags = flags, cat_name = cat_name
   if not keyword_set(cat_name) then cat_name = state.sex_catalog_name
   
   cd, state.phast_dir
-  widget_control,/hourglass
-  textstr = 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
+  ;textstr = 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
   spawn, 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
+  cd, state.launch_dir
+end
+
+;----------------------------------------------------------------------
+
+pro phast_do_swarp,image = image, flags = flags
+
+  ;routine to stitch together a mosaic using the external package SWarp
+
+  common phast_state
+  common phast_images
+  
+  if not keyword_set(image) then image = state.imagename
+  if not keyword_set(flags) then flags = state.swarp_flags
+  if not keyword_set(cat_name) then cat_name = state.sex_catalog_name
+  
+  cd, state.phast_dir
+  spawn, 'swarp ' + image + ' ' + flags
   cd, state.launch_dir
 end
 
