@@ -792,7 +792,7 @@ pro phast_display_stars
         catalog_name = state.overlay_catList(state.overlay_catalog)
         
         widget_control,state.search_msg_id,set_value='Downloading catalog region...'
-        star_catalog = phast_get_stars(a,d,radius,AsOf=obsDate,catalog_name=catalog_name)
+        star_catalog = phast_get_stars(a,d,1.5*radius,AsOf=obsDate,catalog_name=catalog_name)
         image_archive[state.current_image_index]->set_catalog, star_catalog, catalog_name
      endif else begin
         star_catalog = image_archive[state.current_image_index]->get_catalog()
@@ -3741,7 +3741,7 @@ pro phast_settitle, reset=reset
     title = strcompress('PhAst:  '+ name + '  ' + state.title_extras)
     
     if (title_object NE '') then  $
-      title = strcompress(title + ': ' + title_object)
+      title = strcompress(string(title) + ': ' + string(title_object))
       
     widget_control, state.base_id, tlb_set_title = title
   endelse

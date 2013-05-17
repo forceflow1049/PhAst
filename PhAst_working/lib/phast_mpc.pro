@@ -109,13 +109,18 @@ file_delete,'ephem.txt' ;clean up
 ;convert to degrees
 ra_deg = fltarr(n_elements(ra_h))
 dec_deg = fltarr(n_elements(ra_h))
+err_long_deg = fltarr(n_elements(ra_h))
+err_short_deg = fltarr(n_elements(ra_h))
 
 for i=0, n_elements(ra_deg)-1 do begin
    ra_deg[i] = ten(ra_h[i],ra_m[i],ra_s[i])*15
    dec_deg[i] = ten(dec_d[i],dec_m[i],dec_s[i])
-
+   if strpos(err_long[i],"'") ne -1 then err_long_deg[i] = float(err_long[i])/60
+   if strpos(err_long[i],'"') ne -1 then err_long_deg[i] = float(err_long[i])/60/60
+   if strpos(err_short[i],"'") ne -1 then err_short_deg[i] = float(err_short[i])/60
+   if strpos(err_short[i],'"') ne -1 then err_short_deg[i] = float(err_short[i])/60/60
 endfor
-return, list(ra_deg,dec_deg) ;[ra,dec] in degrees
+return, list(ra_deg,dec_deg,err_long_deg,err_short_deg,err_pa) ;[ra,dec,err_long,err_short,err_pa] in degrees
 end
 
 ;----------------------------------------------------------------------

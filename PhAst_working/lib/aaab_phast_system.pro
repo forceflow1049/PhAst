@@ -275,7 +275,21 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
      endif
      jd = sxpar(head,'JD',count=count)
      if count ne 0 then begin
-        image_archive[state.num_images-1]->set_obs_date,jd
+        if long(jd) gt 240000 then begin
+           image_archive[state.num_images-1]->set_obs_date,jd
+           break
+        endif else print, 'Warning: FITS keyword JD appears incorrect.  Trying other methods.'
+     endif
+     datestr = sxpar(head,'DATE-OBS',count=date_count)
+     timestr = sxpar(head,'UT',count=time_count)
+     if (date_count ne 0) and (time_count ne 0) then begin
+        YYYY =  long(strmid(datestr,0,4))
+        MM =  long(strmid(datestr,5,2))
+        DD =  long(strmid(datestr,8,2))
+        HH =  long(strmid(timestr,0,2))
+        Min =  long(strmid(timestr,3,2))
+        Sec = float(strmid(timestr,6))
+        image_archive[state.num_images-1]->set_obs_date, JULDAY(MM,DD,YYYY,HH,Min,Sec)
         break
      endif
      print, 'Supported date keyword not found in FITS header.'
@@ -300,6 +314,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
 
   ;add a new tab for the image.
   state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
+  widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
   ;remove the 'no images loaded' tab, if present
   if (state.num_images eq 1) and (n_elements(state.tab_list) gt 1) then widget_control,state.tab_list.remove(0),/destroy
 end
@@ -693,7 +708,7 @@ pro phast_draw_color_event, event
      end
   endcase
   
-  widget_control, state.draw_widget_id, /sensitive ;, /input_focus  
+  widget_control, state.draw_widget_id, /sensitive, /input_focus  
 end
 
 ;--------------------------------------------------------------------
@@ -723,7 +738,7 @@ pro phast_draw_event, event
      phast_draw_keyboard_event, event
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+     widget_control, state.draw_widget_id, /sensitive, /input_focus
           
 end
 
@@ -810,7 +825,7 @@ pro phast_draw_keyboard_event, event
   endif 
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+     widget_control, state.draw_widget_id, /sensitive, /input_focus
   
 end
 
@@ -894,7 +909,7 @@ pro phast_draw_phot_event, event
   
   if (event.type EQ 2) then phast_draw_motion_event, event
   
-  widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+  widget_control, state.draw_widget_id, /sensitive, /input_focus
 end
 
 ;----------------------------------------------------------------------
@@ -1000,7 +1015,7 @@ pro phast_draw_zoom_event, event
   if (event.type EQ 2) then phast_draw_motion_event, event
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+     widget_control, state.draw_widget_id, /sensitive, /input_focus
 end
 
 ;--------------------------------------------------------------------
@@ -1190,30 +1205,67 @@ pro phast_event, event
            state.tb_mpc_toggle = 0
         endelse
      end
+     'create_mpc_report': phast_mpc_report
      'overlay_ephem': begin
-        ;get the name of the current object
-        name = image_archive[state.current_image_index]->get_obj_name()
-        ;get the date of the observation
-        jd = image_archive[state.current_image_index]->get_obs_date()
-        ;query MPC for ephemeris
-        result = phast_get_mpc_ephem(name,jd)
-        if n_elements(result) eq 0 then return
-        ;convert to xy coords and plot
-        ad2xy, (result[0])[0],(result[1])[0],*state.astr_ptr,x0,y0
-        ad2xy, (result[0])[-1],(result[1])[-1],*state.astr_ptr,x1,y1
-        nplot++
-        region_str = 'line' + '(' + strtrim(string(x0),1) + ', ' + strtrim(string(y0),1) + ', ' + strtrim(string(x1),1) + ', ' + strtrim(string(y1),1)+') # color=blue'
-        options = {color: 'blue', thick:1}
-        options.color = phast_icolor(options.color)
-        pstruct = {type:'region', $             ;type of plot
-                   reg_array:[region_str], $    ;region array to plot
-                   options: options $
-                  }
-        plot_ptr[nplot] = ptr_new(pstruct)
-        phast_plotwindow
-        phast_plot1region, nplot
+        if image_archive[state.current_image_index]->astr_valid() then begin
+           ;get the name of the current object
+           name = image_archive[state.current_image_index]->get_obj_name()
+           ;get the date of the observation
+           jd = image_archive[state.current_image_index]->get_obs_date()
+           ;query MPC for ephemeris
+           result = phast_get_mpc_ephem(name,jd)
+           if n_elements(result) eq 0 then return
+
+           ;errors must be at least as big as the seeing
+           result[2] = result[2] > state.phot_aperFWHM/60/60
+           result[3] = result[3] > state.phot_aperFWHM/60/60
+
+           ;plot the line
+
+           ;convert to xy coords and plot
+           size = n_elements(result[0])
+           ad2xy, (result[0])[0],(result[1])[0],*state.astr_ptr,x0,y0
+           ad2xy, (result[0])[-1],(result[1])[-1],*state.astr_ptr,x1,y1
+           ad2xy, (result[0])[size/2],(result[1])[size/2],*state.astr_ptr,xc,yc
+           nplot++
+           line1_str = 'line' + '(' + strtrim(string(x0),1) + ', ' + strtrim(string(y0),1) + ', ' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1)+') # color=green'
+           options = {color: 'green', thick:1}
+           options.color = phast_icolor(options.color)
+           pstruct = {type:'region', $      ;type of plot
+                      reg_array:[line1_str], $ ;region array to plot
+                      options: options $
+                     }
+           plot_ptr[nplot] = ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region, nplot
+           nplot++
+           line2_str = 'line' + '(' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1) + ', ' + strtrim(string(x1),1) + ', ' + strtrim(string(y1),1)+') # color=green'
+           pstruct = {type:'region', $      ;type of plot
+                      reg_array:[line2_str], $ ;region array to plot
+                      options: options $
+                     }
+           plot_ptr[nplot] = ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region, nplot
+           ;plot the ellipse with 3-sigma errors
+           ad2xy, (result[0])[size/2]+3*(result[2])[size/2],(result[1])[size/2]+3*(result[3])[size/2],*state.astr_ptr,right_x,top_y
+           ad2xy, (result[0])[size/2]-3*(result[2])[size/2],(result[1])[size/2]-3*(result[3])[size/2],*state.astr_ptr,left_x,bot_y
+           x_width = abs(right_x-left_x)
+           y_width = abs(top_y-bot_y)
+           nplot++
+           ellipse_str = 'ellipse' + '(' + strtrim(string(xc),1) + ', ' + $
+                         strtrim(string(yc),1) + ', ' + strtrim(string(y_width),1) + ', ' + strtrim(string(x_width),1) + ', ' + strtrim(string((result[4])[size/2]),1)+ ') # color=green'
+           options = {color: 'green', thick:1}
+           options.color = phast_icolor(options.color)
+           pstruct = {type:'region', $        ;type of plot
+                      reg_array:[ellipse_str], $ ;region array to plot
+                      options: options $
+                     }
+           plot_ptr[nplot] = ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region, nplot
+        endif else tmp = dialog_message('You must have an astrometric solution to retrieve an ephemeris!',/error,/center)
      end
-     
      ;align
      'align_toggle': begin
         if state.align_toggle eq 0 then begin
@@ -1498,7 +1550,7 @@ pro phast_image__define
             header_struct: ptr_new(), $ ;holds the image header as a structure
             name:ptr_new(),$    ;holds the file path to the image
             obj_name:ptr_new(),$;name of the object
-            obs_date:ptr_new(),$;obsrvation date in MJD
+            obs_date:ptr_new(),$;obsrvation date in JD
             size:ptr_new(),$    ;contains the size of the image: [x,y]
             astr:ptr_new(),$    ;holds astrometry data, if available
             rotation:ptr_new(),$;holds rotation state of image in deg
@@ -3401,8 +3453,10 @@ pro phast_startup, phast_dir, launch_dir, small
   ;MPC toolbox
   if state.tb_mpc_visible eq 1 then begin
      mpc_toggle = widget_button(left_pane,value='MPC Tools',uvalue='mpc_toggle')
-     state.mpc_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
-     overlay_ephem = widget_button(state.mpc_box_id,value='Overlay Ephemeris',uvalue='overlay_ephem')
+     state.mpc_box_id = widget_base(left_pane,/column,frame=4,xsize=250,/base_align_center)
+     mpc_button_box_1 = widget_base(state.mpc_box_id,/row)
+     create_mpc_report = widget_button(mpc_button_box_1,value='Start MPC report',uvalue='create_mpc_report')
+     overlay_ephem = widget_button(mpc_button_box_1,value='Overlay Ephemeris',uvalue='overlay_ephem')
   endif
   
   ; Set widget y size for small screens

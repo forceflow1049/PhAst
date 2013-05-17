@@ -50,29 +50,19 @@ pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul
   X = sxpar(*state.head_ptr,'AIRMASS')  >  0.00 ; use X=0.0 if AIRMASS not present
   if image_archive[state.current_image_index]->get_obs_date() eq 0 then begin
   
-  timestr = sxpar(*state.head_ptr,'UT',count=count)
-  if count ne 0 then begin
-     HH =  long(strmid(timestr,0,2))
-     Min =  long(strmid(timestr,3,2))
-     Sec = float(strmid(timestr,6))
-  endif
-  datestr = sxpar(*state.head_ptr,'DATE-OBS',count=count)
-  if count ne 0 then begin
-     YYYY =  long(strmid(datestr,0,4))
-     MM =  long(strmid(datestr,5,2))
-     DD =  long(strmid(datestr,8,2))
-  endif  else begin
-     mjd = sxpar(*state.head_ptr,'MJD-OBS',count=count)
-     if count ne 0 then begin 
-        daycnv, mjd, YYYY,MM,DD,HH
-        Min = (HH - fix(HH))*60
-        HH = fix(HH)
-        Sec = (Min - fix(Min))*60
-        Min = fix(Min)
+     timestr = sxpar(*state.head_ptr,'UT',count=count)
+     if count ne 0 then begin
+        HH =  long(strmid(timestr,0,2))
+        Min =  long(strmid(timestr,3,2))
+        Sec = float(strmid(timestr,6))
      endif
-  endelse
-  
-  datejul = JULDAY(MM,DD,YYYY,HH,Min,Sec)
+     datestr = sxpar(*state.head_ptr,'DATE-OBS',count=count)
+     if count ne 0 then begin
+        YYYY =  long(strmid(datestr,0,4))
+        MM =  long(strmid(datestr,5,2))
+        DD =  long(strmid(datestr,8,2))
+     endif     
+     datejul = JULDAY(MM,DD,YYYY,HH,Min,Sec)
   endif else begin 
      datejul = image_archive[state.current_image_index]->get_obs_date()
      date_vec = date_conv(datejul,'V')

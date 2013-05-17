@@ -432,7 +432,7 @@ pro phast_calculate_zeropoint, msgarr
   endif
   
   ; begin zeropoint determination
-  widget_control,/hourglass ;this could be slow
+  widget_control,/hourglass     ;this could be slow
   
   match_tol = 2.0 / 3600.   ; astrometric matching tolerance (arcsecs converted to degrees)
   sigmaClip = 3.0           ; outlier rejection (about 1-300 chance < |t|)
@@ -520,17 +520,20 @@ pro phast_calculate_zeropoint, msgarr
   endelse
   
   ; 4) Match catalog objects to image
-          Cat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat magnitude of matching star
-       errCat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-     ColorFit = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index to fit color term
+  Cat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat magnitude of matching star
+  errCat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
+  ColorFit = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index to fit color term
   errColorFit = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-     ColorExt = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for extinction
+  ColorExt = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for extinction
   errColorExt = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-     ColorTrm = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for input color term
+  ColorTrm = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for input color term
   errColorTrm = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-    cosDec = cos(im_Dec*!PI/180.0)
-  
+  cosDec = cos(im_Dec*!PI/180.0)
+
+  progress_bar = obj_new('cgprogressbar',title='Matching stars to catalog')
+  progress_bar->start
   for i=0, n_elements(Instr)-1 do begin
+     progress_bar->update,float(i)/n_elements(instr)*100
     match_dist = 1.0 ;(in deg)
     close_dist = 1.0
     match_index = -1 ; will be set to catalog index j when a match is found
@@ -554,7 +557,7 @@ pro phast_calculate_zeropoint, msgarr
       errColorTrm[i] = err_ColorTrm[match_index]
     endif
   endfor
-  
+  progress_bar->destroy
   ; adjust instrumental magnitude for extinction
   extMethod = 1 ; adjust for extinction color
   magType   = 2 ; (std) catalog magnitude
