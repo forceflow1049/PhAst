@@ -203,58 +203,26 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   common phast_images
   if not keyword_set(refresh_toggle) then begin ;normal image adding
      new_image_size = size(new_image)
-     ;if not keyword_set(dir_add) then begin
      if state.num_images gt 0 then begin ;check not first image
-           state.num_images++
-           if state.num_images gt state.archive_size then phast_expand_archive
-           image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
-           image_archive[state.num_images-1]->set_image, new_image
-           image_archive[state.num_images-1]->set_name, filename
-           image_archive[state.num_images-1]->set_header, head, /string
-           image_archive[state.num_images-1]->set_rotation,0.0
-           phast_setheader,head
-           newimage = 1
-           state.current_image_index = state.num_images-1
-        endif else begin        ;handle first image add
-           state.num_images++
-           image_archive[0] = obj_new('phast_image') ;create new image object
-           image_archive[0]->set_image, new_image
-           image_archive[0]->set_name, filename
-           image_archive[0]->set_header, head, /string
-           image_archive[0]->set_rotation,0.0
-           newimage = 1
-        endelse
-     ;; endif else begin           ;handle directory add
-     ;;    if keyword_set(dir_num) then begin
-     ;;       ;; if state.num_images gt 0 then begin
-     ;;          phast_expand_archive, num=dir_num
-     ;;          image_archive[state.num_images] = obj_new('phast_image') ;create new image object
-     ;;          image_archive[state.num_images]->set_image, new_image
-     ;;          image_archive[state.num_images]->set_name, filename
-     ;;          image_archive[state.num_images]->set_header, head, /string
-     ;;          image_archive[state.num_images]->set_rotation,0.0
-     ;;          state.num_images++
-     ;;          newimage = 1
-     ;;       ;; endif else begin     ;handle first image add
-     ;;       ;;    state.num_images++
-     ;;       ;;    image_archive[0] = obj_new('phast_image') ;create new image object
-     ;;       ;;    image_archive[0]->set_image, new_image
-     ;;       ;;    image_archive[0]->set_name, filename
-     ;;       ;;    image_archive[0]->set_header, head
-     ;;       ;;    image_archive[0]->set_rotation,0.0
-     ;;       ;;    newimage = 1
-     ;;       ;; endelse
-     ;;    endif else begin
-     ;;       image_archive[state.num_images] = obj_new('phast_image') ;create new image object
-     ;;       image_archive[state.num_images]->set_image, new_image
-     ;;       image_archive[state.num_images]->set_name, filename
-     ;;       image_archive[state.num_images]->set_header, head, /string
-     ;;       image_archive[state.num_images]->set_rotation,0.0
-     ;;       state.num_images++
-     ;;    endelse
-     ;;    state.current_image_index = state.num_images-1
-     ;; endelse
-     
+        state.num_images++
+        if state.num_images gt state.archive_size then phast_expand_archive
+        image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
+        image_archive[state.num_images-1]->set_image, new_image
+        image_archive[state.num_images-1]->set_name, filename
+        image_archive[state.num_images-1]->set_header, head, /string
+        image_archive[state.num_images-1]->set_rotation,0.0
+        phast_setheader,head
+        newimage = 1
+        state.current_image_index = state.num_images-1
+     endif else begin           ;handle first image add
+        state.num_images++
+        image_archive[0] = obj_new('phast_image') ;create new image object
+        image_archive[0]->set_image, new_image
+        image_archive[0]->set_name, filename
+        image_archive[0]->set_header, head, /string
+        image_archive[0]->set_rotation,0.0
+        newimage = 1
+     endelse  
   endif else begin              ;handle image refresh
      image_archive[refresh]->set_image, new_image
      image_archive[refresh]->set_name, filename
@@ -2190,8 +2158,11 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
   if (n_elements(fitsfilename) EQ 0) then begin
      if keyword_set(dir) then begin
         fitsloc = dialog_pickfile(/read,/directory,group=state.base_id,path=state.current_dir,get_path=tmp_dir,title='Select a directory with FITS images')
-        fitsfile = findfile(fitsloc+'*.fits',count=num_new_images)
-        if n_elements(fitsfile) eq 1 then result = dialog_message('Directory contains no FITS images!',/center,/error)
+           fitsfile = findfile(fitsloc+'*.fits',count=num_new_images) 
+           if n_elements(fitsfile) eq 1 then begin
+              result = dialog_message('Directory contains no FITS images!',/center,/error)
+              return
+           endif
      endif else begin
         fitsloc = $
            dialog_pickfile( $
