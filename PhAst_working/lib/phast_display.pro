@@ -2484,7 +2484,7 @@ pro phast_plot1region, iplot
         endif
         
         tvcircle, radius, xcenter, ycenter, $
-          _extra = (*(plot_ptr[iplot])).options
+          _extra = (*(plot_ptr[iplot])).options,/device
           
         if (text_str ne '') then xyouts, xcenter, ycenter, text_str, $
           alignment=0.5, _extra = (*(plot_ptr[iplot])).options, /device

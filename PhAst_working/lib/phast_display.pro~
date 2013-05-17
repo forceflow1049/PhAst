@@ -2821,9 +2821,8 @@ pro phast_resize
   window = (state.base_min_size > tmp_event)
   
   newbase = window - state.base_pad
-  newxsize = (tmp_event[0] - state.base_pad[0]) ;> $
-  ;  (state.base_min_size[0] - state.base_pad[0])
-  newysize = (tmp_event[1] - state.base_pad[1]) ;> $
+  newxsize = (tmp_event[0] - state.base_pad[0]) > 800; (state.base_min_size[0] - state.base_pad[0])
+  newysize = (tmp_event[1] - state.base_pad[1]) > 400;> $
   ;  (state.base_min_size[1] - state.base_pad[1])
   
   
@@ -2834,8 +2833,9 @@ pro phast_resize
     
   state.draw_window_size = [newxsize, newysize]
   
-  phast_colorbar
+  ;phast_colorbar
   
+  widget_control, state.tab_bar_id, xsize=newxsize-280
   widget_control, state.base_id, /clear_events
   widget_control, state.draw_base_id, /sensitive;, /input_focus
 end

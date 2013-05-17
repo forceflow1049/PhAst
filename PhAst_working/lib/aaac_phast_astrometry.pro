@@ -37,6 +37,8 @@ pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul
   ; get common specs for image
 
   common phast_state
+  common phast_images
+
   if ptr_valid(state.astr_ptr) then begin
      xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a0,d0 ; center
      xy2ad,state.image_size[0]  ,state.image_size[1]  ,*(state.astr_ptr),a1,d1 ; corner
@@ -46,23 +48,38 @@ pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul
   endelse
   radius = state.pixelscale * sqrt( (state.image_size[0]/2)^2 + (state.image_size[1]/2)^2 ) / 60.0
   X = sxpar(*state.head_ptr,'AIRMASS')  >  0.00 ; use X=0.0 if AIRMASS not present
-  timestr = sxpar(*state.head_ptr,'UT')
-  HH =  long(strmid(timestr,0,2))
-  Min =  long(strmid(timestr,3,2))
-  Sec = float(strmid(timestr,6))
+  if image_archive[state.current_image_index]->get_obs_date() eq 0 then begin
+  
+  timestr = sxpar(*state.head_ptr,'UT',count=count)
+  if count ne 0 then begin
+     HH =  long(strmid(timestr,0,2))
+     Min =  long(strmid(timestr,3,2))
+     Sec = float(strmid(timestr,6))
+  endif
   datestr = sxpar(*state.head_ptr,'DATE-OBS',count=count)
   if count ne 0 then begin
      YYYY =  long(strmid(datestr,0,4))
      MM =  long(strmid(datestr,5,2))
      DD =  long(strmid(datestr,8,2))
-  endif else begin
+  endif  else begin
      mjd = sxpar(*state.head_ptr,'MJD-OBS',count=count)
-     if count ne 0 then daycnv, mjd, YYYY,MM,DD,HH
+     if count ne 0 then begin 
+        daycnv, mjd, YYYY,MM,DD,HH
+        Min = (HH - fix(HH))*60
+        HH = fix(HH)
+        Sec = (Min - fix(Min))*60
+        Min = fix(Min)
+     endif
   endelse
-
+  
   datejul = JULDAY(MM,DD,YYYY,HH,Min,Sec)
-  exptime = float(sxpar(*state.head_ptr,'EXPTIME'))
-  datejul = datejul + 0.5*exptime/3600./24.
+  endif else begin 
+     datejul = image_archive[state.current_image_index]->get_obs_date()
+     date_vec = date_conv(datejul,'V')
+     YYYY = date_vec[0]
+  endelse
+     exptime = float(sxpar(*state.head_ptr,'EXPTIME'))
+     datejul = datejul + 0.5*exptime/3600./24.
   frac = (datejul-julday(01,01,YYYY,00,00,00))/365.0 ; julian year
   obsDate = float(YYYY)+frac
 end

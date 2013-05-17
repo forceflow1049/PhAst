@@ -47,6 +47,8 @@ phast_system: contains common blocks and archives and basic routines
      phast_image::get_max_stretch
      phast_image::get_min_stretch
      phast_image::get_name
+     phast_image::get_obj_name
+     phast_image::get_obs_date
      phast_image::get_rotation
      phast_image::get_size
      phast_image::init
@@ -59,6 +61,8 @@ phast_system: contains common blocks and archives and basic routines
      phast_image::set_max_stretch
      phast_image::set_min_stretch
      phast_image::set_name
+     phast_image::set_obj_name
+     phast_image::set_obs_date
      phast_image:set_rotation
      phast_initcube
      phast_killcube
@@ -201,6 +205,7 @@ phast_photometry: handles image photometry
 
 phast_mpc: handles MPC reporting tasks
      phast_get_mpc_data
+     phast_get_mpc_ephem
      phast_mpc_generate_report
      phast_mpc_report
      phast_mpc_report_event

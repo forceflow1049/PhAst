@@ -262,6 +262,24 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
      image_archive[refresh]->set_rotation,0.0
      newimage = 1
   endelse
+
+  ;Extract information about image to store in the image object
+
+  ;get date of observation
+  while (1 eq 1) do begin ;choose only one
+     mjd = sxpar(head,'MJD-OBS',count=count)
+     if count ne 0 then begin
+        image_archive[state.num_images-1]->set_obs_date,mjd
+        break
+     endif
+     mjd = sxpar(head,'JD',count=count)
+     if count ne 0 then begin
+        image_archive[state.num_images-1]->set_obs_date,mjd
+        break
+     endif
+     print, 'Supported date keyword not found in FITS header.'
+     break
+  endwhile
         
   ;update widgets
   ;if not keyword_set(refresh_toggle) then widget_control,state.image_counter_id,set_value='Cycle images: '+ strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
@@ -276,6 +294,8 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
 
   ;add a new tab for the image.
   state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
+  ;remove the 'no images loaded' tab, if present
+  if (state.num_images eq 1) and (n_elements(state.tab_list) gt 1) then widget_control,state.tab_list.remove(0),/destroy
 end
 
 ;-------------------------------------------------------------------
@@ -1153,6 +1173,23 @@ pro phast_event, event
         endelse
      end
      'check_moons': phast_check_moons
+
+     ;MPC toolbox
+     'mpc_toggle': begin
+        if state.tb_mpc_toggle eq 0 then begin
+           widget_control,state.mpc_box_id,ysize=35
+           state.tb_mpc_toggle = 1
+        endif else begin
+           widget_control,state.mpc_box_id,ysize=1
+           state.tb_mpc_toggle = 0
+        endelse
+     end
+     'overlay_ephem': begin
+        ;get the name of the current object
+        name = image_archive[state.current_image_index]->get_obj_name()
+        ;get the date of the observation
+        mjd = image_archive[state.current_image_index]->get_obs_date()
+     end
      
      ;align
      'align_toggle': begin
@@ -1437,6 +1474,8 @@ pro phast_image__define
             header_string: ptr_new(),$  ;holds the image header in string format
             header_struct: ptr_new(), $ ;holds the image header as a structure
             name:ptr_new(),$    ;holds the file path to the image
+            obj_name:ptr_new(),$;name of the object
+            obs_date:ptr_new(),$;obsrvation date in MJD
             size:ptr_new(),$    ;contains the size of the image: [x,y]
             astr:ptr_new(),$    ;holds astrometry data, if available
             rotation:ptr_new(),$;holds rotation state of image in deg
@@ -1479,6 +1518,8 @@ pro phast_image::Cleanup
   ptr_free,self.header_string
   ptr_free,self.header_struct
   ptr_free,self.name
+  ptr_free,self.obj_name
+  ptr_free,self.obs_date
   ptr_free,self.size
   ptr_free,self.rotation
   ptr_free,self.astr
@@ -1562,6 +1603,24 @@ end
 
 ;----------------------------------------------------------------------
 
+function phast_image::get_obj_name
+  
+;routine to get object name from image object
+  
+  return, *(self.obj_name)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_obs_date
+  
+;routine to get observation date from image object
+  
+  return, *(self.obs_date)
+end
+
+;----------------------------------------------------------------------
+
 function phast_image::get_rotation
   
 ;routine to get image rotation state in degrees
@@ -1593,6 +1652,8 @@ function phast_image::init
   self.header_string = ptr_new(/allocate)
   self.header_struct = ptr_new(/allocate)
   self.name = ptr_new(/allocate)
+  self.obj_name = ptr_new('')
+  self.obs_date = ptr_new(0.0)
   self.size = ptr_new(/allocate)
   self.rotation = ptr_new(/allocate)
   self.max_stretch = ptr_new(/allocate)
@@ -1681,6 +1742,23 @@ pro phast_image::set_name, name
   
   *(self.name) = name
 end
+
+;----------------------------------------------------------------------
+pro phast_image::set_obj_name, name
+  
+;routine to set image name for image object
+  
+  *(self.obj_name) = name
+end
+
+;----------------------------------------------------------------------
+pro phast_image::set_obs_date, date
+  
+;routine to set observation date for image object
+  
+  *(self.obs_date) = double(date)
+end
+
 
 ;----------------------------------------------------------------------
 
@@ -2564,6 +2642,7 @@ pro phast_remove_image,index=index,all=all
   common phast_images
   if not keyword_set(all) then begin
      obj_destroy, image_archive[index]
+     if state.num_images eq 1 then state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
      widget_control, state.tab_list.remove(index),/destroy
      if state.num_images gt 1 then begin
         temp_image = objarr(state.num_images-1)
@@ -2605,9 +2684,10 @@ pro phast_remove_image,index=index,all=all
         phast_base_image
      endelse
   endif else begin
+     state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
      for i=0,state.num_images-1 do begin
         obj_destroy,image_archive[i]
-        widget_control, state.tab_list.remove(index),/destroy
+        widget_control, state.tab_list.remove(0),/destroy
      endfor
      state.num_images = 0
      state.current_image_index = 0
@@ -2881,7 +2961,7 @@ end
 
 ;---------------------------------------------------------------------
 
-pro phast_startup, phast_dir, launch_dir
+pro phast_startup, phast_dir, launch_dir, small
 
 ; This routine initializes the phast internal variables, and creates and
 ; realizes the window widgets.  It is only called by the phast main
@@ -2897,15 +2977,17 @@ pro phast_startup, phast_dir, launch_dir
   ; As a bare minimum, we need the 8 basic colors used by PHAST_ICOLOR(),
   ; plus 2 more for a color map.
         
-  ;loadct, 0, /silent
+                                ;loadct, 0, /silent
   if (!d.table_size LT 12) then begin
      message, 'Too few colors available for color table'
      tvlct, user_r, user_g, user_b
      phast_shutdown
   endif
-        
+  
   ; Initialize the common blocks
-  phast_initcommon, phast_dir, launch_dir
+  phast_initcommon, phast_dir, launch_dir, small
+  
+
         
   state.active_window_pmulti = !p.multi
   !p.multi = 0
@@ -3113,6 +3195,7 @@ pro phast_startup, phast_dir, launch_dir
   right_button = widget_button(right_top_box,value='--->', uvalue='right_button',$
                                tooltip='Next image')
   state.tab_bar_id = widget_tab(right_top_box,xsize=500,uvalue='tab_list')
+  state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
   align_toggle_box = widget_base(right_top_box,/nonexclusive)
   state.align_toggle_button = widget_button(align_toggle_box,value='Align images',uvalue='align_toggle',tooltip='Align images using WCS coordinates')
   state.draw_base_id = widget_base(right_pane, $
@@ -3290,7 +3373,13 @@ pro phast_startup, phast_dir, launch_dir
      state.spice_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
      spice_sub_box = widget_base(state.spice_box_id,/row)
      check_moons = widget_button(spice_sub_box,value='Check Moons', uvalue='check_moons')
-     
+  endif
+
+  ;MPC toolbox
+  if state.tb_mpc_visible eq 1 then begin
+     mpc_toggle = widget_button(left_pane,value='MPC Tools',uvalue='mpc_toggle')
+     state.mpc_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
+     overlay_ephem = widget_button(state.mpc_box_id,value='Overlay Ephemeris',uvalue='overlay_ephem')
   endif
   
   ; Set widget y size for small screens

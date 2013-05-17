@@ -262,6 +262,30 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
      image_archive[refresh]->set_rotation,0.0
      newimage = 1
   endelse
+
+  ;Extract information about image to store in the image object
+
+  ;get date of observation
+  while (1 eq 1) do begin ;choose only one
+     mjd = sxpar(head,'MJD-OBS',count=count)
+     if count ne 0 then begin
+        jd = double(mjd) + 2400000.5d
+        image_archive[state.num_images-1]->set_obs_date,jd
+        break
+     endif
+     jd = sxpar(head,'JD',count=count)
+     if count ne 0 then begin
+        image_archive[state.num_images-1]->set_obs_date,jd
+        break
+     endif
+     print, 'Supported date keyword not found in FITS header.'
+     break
+  endwhile
+  ;get the name of the object observed
+  obj_name = sxpar(head,'OBJECT',count=count)
+  if count ne 0 then begin
+     image_archive[state.num_images-1]->set_obj_name, obj_name
+  endif
         
   ;update widgets
   ;if not keyword_set(refresh_toggle) then widget_control,state.image_counter_id,set_value='Cycle images: '+ strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
@@ -1155,6 +1179,40 @@ pro phast_event, event
         endelse
      end
      'check_moons': phast_check_moons
+
+     ;MPC toolbox
+     'mpc_toggle': begin
+        if state.tb_mpc_toggle eq 0 then begin
+           widget_control,state.mpc_box_id,ysize=35
+           state.tb_mpc_toggle = 1
+        endif else begin
+           widget_control,state.mpc_box_id,ysize=1
+           state.tb_mpc_toggle = 0
+        endelse
+     end
+     'overlay_ephem': begin
+        ;get the name of the current object
+        name = image_archive[state.current_image_index]->get_obj_name()
+        ;get the date of the observation
+        jd = image_archive[state.current_image_index]->get_obs_date()
+        ;query MPC for ephemeris
+        result = phast_get_mpc_ephem(name,jd)
+        if n_elements(result) eq 0 then return
+        ;convert to xy coords and plot
+        ad2xy, (result[0])[0],(result[1])[0],*state.astr_ptr,x0,y0
+        ad2xy, (result[0])[-1],(result[1])[-1],*state.astr_ptr,x1,y1
+        nplot++
+        region_str = 'line' + '(' + strtrim(string(x0),1) + ', ' + strtrim(string(y0),1) + ', ' + strtrim(string(x1),1) + ', ' + strtrim(string(y1),1)+') # color=blue'
+        options = {color: 'blue', thick:1}
+        options.color = phast_icolor(options.color)
+        pstruct = {type:'region', $             ;type of plot
+                   reg_array:[region_str], $    ;region array to plot
+                   options: options $
+                  }
+        plot_ptr[nplot] = ptr_new(pstruct)
+        phast_plotwindow
+        phast_plot1region, nplot
+     end
      
      ;align
      'align_toggle': begin
@@ -1439,6 +1497,8 @@ pro phast_image__define
             header_string: ptr_new(),$  ;holds the image header in string format
             header_struct: ptr_new(), $ ;holds the image header as a structure
             name:ptr_new(),$    ;holds the file path to the image
+            obj_name:ptr_new(),$;name of the object
+            obs_date:ptr_new(),$;obsrvation date in MJD
             size:ptr_new(),$    ;contains the size of the image: [x,y]
             astr:ptr_new(),$    ;holds astrometry data, if available
             rotation:ptr_new(),$;holds rotation state of image in deg
@@ -1481,6 +1541,8 @@ pro phast_image::Cleanup
   ptr_free,self.header_string
   ptr_free,self.header_struct
   ptr_free,self.name
+  ptr_free,self.obj_name
+  ptr_free,self.obs_date
   ptr_free,self.size
   ptr_free,self.rotation
   ptr_free,self.astr
@@ -1564,6 +1626,24 @@ end
 
 ;----------------------------------------------------------------------
 
+function phast_image::get_obj_name
+  
+;routine to get object name from image object
+  
+  return, *(self.obj_name)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_obs_date
+  
+;routine to get observation date from image object
+  
+  return, *(self.obs_date)
+end
+
+;----------------------------------------------------------------------
+
 function phast_image::get_rotation
   
 ;routine to get image rotation state in degrees
@@ -1595,6 +1675,8 @@ function phast_image::init
   self.header_string = ptr_new(/allocate)
   self.header_struct = ptr_new(/allocate)
   self.name = ptr_new(/allocate)
+  self.obj_name = ptr_new('')
+  self.obs_date = ptr_new(0.0)
   self.size = ptr_new(/allocate)
   self.rotation = ptr_new(/allocate)
   self.max_stretch = ptr_new(/allocate)
@@ -1683,6 +1765,23 @@ pro phast_image::set_name, name
   
   *(self.name) = name
 end
+
+;----------------------------------------------------------------------
+pro phast_image::set_obj_name, name
+  
+;routine to set image name for image object
+  
+  *(self.obj_name) = name
+end
+
+;----------------------------------------------------------------------
+pro phast_image::set_obs_date, date
+  
+;routine to set observation date for image object
+  
+  *(self.obs_date) = double(date)
+end
+
 
 ;----------------------------------------------------------------------
 
@@ -3297,7 +3396,13 @@ pro phast_startup, phast_dir, launch_dir, small
      state.spice_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
      spice_sub_box = widget_base(state.spice_box_id,/row)
      check_moons = widget_button(spice_sub_box,value='Check Moons', uvalue='check_moons')
-     
+  endif
+
+  ;MPC toolbox
+  if state.tb_mpc_visible eq 1 then begin
+     mpc_toggle = widget_button(left_pane,value='MPC Tools',uvalue='mpc_toggle')
+     state.mpc_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
+     overlay_ephem = widget_button(state.mpc_box_id,value='Overlay Ephemeris',uvalue='overlay_ephem')
   endif
   
   ; Set widget y size for small screens

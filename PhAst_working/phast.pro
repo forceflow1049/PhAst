@@ -164,6 +164,9 @@ pro phast_initcommon, phast_dir, launch_dir, small
     }
     
   state = {                $
+    tb_mpc_toggle: 1, $    ;is the MPC toolbox opened?
+    mpc_box_id: 0L, $      ;Widget ID for MPC toolbox
+    tb_mpc_visible: 1, $   ;is the MPC toolbox drawn?
     batch_astrometry_toggle_state:1,$;is batch astro base visible?
     batch_astrometry_base:0L,$;Widget ID of batch astrometry base
     batch_astrometry_toggle:0L,$;button to show/hide batch astro settings
