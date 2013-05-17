@@ -203,8 +203,8 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   common phast_images
   if not keyword_set(refresh_toggle) then begin ;normal image adding
      new_image_size = size(new_image)
-     if not keyword_set(dir_add) then begin
-        if state.num_images gt 0 then begin ;check not first image
+     ;if not keyword_set(dir_add) then begin
+     if state.num_images gt 0 then begin ;check not first image
            state.num_images++
            if state.num_images gt state.archive_size then phast_expand_archive
            image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
@@ -224,36 +224,36 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
            image_archive[0]->set_rotation,0.0
            newimage = 1
         endelse
-     endif else begin           ;handle directory add
-        if keyword_set(dir_num) then begin
-           ;; if state.num_images gt 0 then begin
-              phast_expand_archive, num=dir_num
-              image_archive[state.num_images] = obj_new('phast_image') ;create new image object
-              image_archive[state.num_images]->set_image, new_image
-              image_archive[state.num_images]->set_name, filename
-              image_archive[state.num_images]->set_header, head, /string
-              image_archive[state.num_images]->set_rotation,0.0
-              state.num_images++
-              newimage = 1
-           ;; endif else begin     ;handle first image add
-           ;;    state.num_images++
-           ;;    image_archive[0] = obj_new('phast_image') ;create new image object
-           ;;    image_archive[0]->set_image, new_image
-           ;;    image_archive[0]->set_name, filename
-           ;;    image_archive[0]->set_header, head
-           ;;    image_archive[0]->set_rotation,0.0
-           ;;    newimage = 1
-           ;; endelse
-        endif else begin
-           image_archive[state.num_images] = obj_new('phast_image') ;create new image object
-           image_archive[state.num_images]->set_image, new_image
-           image_archive[state.num_images]->set_name, filename
-           image_archive[state.num_images]->set_header, head, /string
-           image_archive[state.num_images]->set_rotation,0.0
-           state.num_images++
-        endelse
-        state.current_image_index = state.num_images-1
-     endelse
+     ;; endif else begin           ;handle directory add
+     ;;    if keyword_set(dir_num) then begin
+     ;;       ;; if state.num_images gt 0 then begin
+     ;;          phast_expand_archive, num=dir_num
+     ;;          image_archive[state.num_images] = obj_new('phast_image') ;create new image object
+     ;;          image_archive[state.num_images]->set_image, new_image
+     ;;          image_archive[state.num_images]->set_name, filename
+     ;;          image_archive[state.num_images]->set_header, head, /string
+     ;;          image_archive[state.num_images]->set_rotation,0.0
+     ;;          state.num_images++
+     ;;          newimage = 1
+     ;;       ;; endif else begin     ;handle first image add
+     ;;       ;;    state.num_images++
+     ;;       ;;    image_archive[0] = obj_new('phast_image') ;create new image object
+     ;;       ;;    image_archive[0]->set_image, new_image
+     ;;       ;;    image_archive[0]->set_name, filename
+     ;;       ;;    image_archive[0]->set_header, head
+     ;;       ;;    image_archive[0]->set_rotation,0.0
+     ;;       ;;    newimage = 1
+     ;;       ;; endelse
+     ;;    endif else begin
+     ;;       image_archive[state.num_images] = obj_new('phast_image') ;create new image object
+     ;;       image_archive[state.num_images]->set_image, new_image
+     ;;       image_archive[state.num_images]->set_name, filename
+     ;;       image_archive[state.num_images]->set_header, head, /string
+     ;;       image_archive[state.num_images]->set_rotation,0.0
+     ;;       state.num_images++
+     ;;    endelse
+     ;;    state.current_image_index = state.num_images-1
+     ;; endelse
      
   endif else begin              ;handle image refresh
      image_archive[refresh]->set_image, new_image
@@ -2156,40 +2156,16 @@ pro phast_move_cursor, direction
 end
 
 ;------------------------------------------------------------------
-pro phast_plainfits_read, fitsloc, head, cancelled,dir=dir,refresh_index=index,refresh_toggle=refresh, newimage = newimage
+pro phast_plainfits_read, fitsloc, head, cancelled,refresh_index=index,refresh_toggle=refresh, newimage = newimage
 
   ; Fits reader for plain fits files, no extensions.
 
   common phast_images
   
-  ;main_image=0
-  if keyword_set(dir) then begin
-    fitsfile = findfile(fitsloc+'*.fits')
-    if fitsfile[0] ne '' then begin ;check folder actually contains any images
-      ;read first image and set up directory add
-      fits_read, fitsfile[0],main_image,head
-      head = headfits(fitsfile[0])
-      phast_add_image,main_image,fitsfile[0],head, newimage = newimage, /dir_add, dir_num = n_elements(fitsfile)
-      progress_bar = obj_new('cgprogressbar',title='Opening images')
-      progress_bar->start
-      file_count = n_elements(fitsfile)
-      for i=1, file_count-1 do begin
-         fits_read, fitsfile[i],main_image,head
-         head = headfits(fitsfile[i])
-         phast_add_image,main_image,fitsfile[i],head, newimage = newimage,/dir_add
-         progress_bar->update,float(i)/file_count*100
-      endfor
-      progress_bar->destroy
-    endif else begin
-      newimage = 0 ;if empty, no new image
-      result = dialog_message('Directory contains no FITS images!',/center,/error)
-    endelse
-  endif else begin
-    fits_read, fitsloc, main_image, head
-    if not keyword_set(refresh) then begin
-      phast_add_image,main_image,fitsloc,head, newimage = newimage
-    endif else phast_add_image,main_image,fitsloc,head,refresh_index=index,/refresh_toggle, newimage =newimage
-  endelse
+  fits_read, fitsloc, main_image, head
+  if not keyword_set(refresh) then begin
+     phast_add_image,main_image,fitsloc,head, newimage = newimage
+  endif else phast_add_image,main_image,fitsloc,head,refresh_index=index,/refresh_toggle, newimage =newimage
 end
 
 ;------------------------------------------------------------------
@@ -2212,130 +2188,135 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
   ; If fitsfilename hasn't been passed to this routine, get filename
   ; from dialog_pickfile.
   if (n_elements(fitsfilename) EQ 0) then begin
-    if keyword_set(dir) then begin
-      fitsfile = dialog_pickfile(/read,/directory)
-      if fitsfile ne '' then phast_plainfits_read, fitsfile, head, cancelled, /dir,newimage=newimage ;check for cancel
-    endif else begin
-      fitsfile = $
-        dialog_pickfile( $
-        filter = filterlist, $
-        group = state.base_id, $
-        /must_exist, $
-        /read, $
-        path = state.current_dir, $
-        get_path = tmp_dir, $
-        title = 'Select FITS Image')
-      if (tmp_dir NE '') then state.current_dir = tmp_dir
-      if (fitsfile EQ '') then return ; 'cancel' button returns empty string
-    endelse
+     if keyword_set(dir) then begin
+        fitsloc = dialog_pickfile(/read,/directory,group=state.base_id,path=state.current_dir,get_path=tmp_dir,title='Select a directory with FITS images')
+        fitsfile = findfile(fitsloc+'*.fits',count=num_new_images)
+        if n_elements(fitsfile) eq 1 then result = dialog_message('Directory contains no FITS images!',/center,/error)
+     endif else begin
+        fitsloc = $
+           dialog_pickfile( $
+           filter = filterlist, $
+           group = state.base_id, $
+           /must_exist, $
+           /read, $
+           path = state.current_dir, $
+           get_path = tmp_dir, $
+           title = 'Select FITS Image')
+        num_new_images = 1
+        fitsfile = fitsloc
+     endelse
+     if (tmp_dir NE '') then state.current_dir = tmp_dir
+     if (fitsloc EQ '') then return ; 'cancel' button returns empty string
   endif else begin
-    fitsfile = fitsfilename
+     fitsfile = fitsfilename
   endelse
   
-  
-  if not keyword_set(dir) then begin
-  
+  ;if adding a directory, expand the archive
+  if keyword_set(dir) then phast_expand_archive,num=num_new_images
+
+  progress_bar = obj_new('cgprogressbar',title='Opening images')
+  progress_bar->start
+  for i=0, num_new_images-1 do begin  
     ; Get fits header so we know what kind of image this is.
-    head = headfits(fitsfile)   ;, errmsg = errmsg)
+     head = headfits(fitsfile[i])  ;, errmsg = errmsg)
     
     ; Check validity of fits file header
-    if (n_elements(strcompress(head, /remove_all)) LT 2) then begin
-      phast_message, 'File does not appear to be a valid FITS image!', $
-        window = window, msgtype = 'error'
-      return
-    endif
-    if (!ERR EQ -1) then begin
-      phast_message, $
-        'Selected file does not appear to be a valid FITS image!', $
-        msgtype = 'error', window = window
-      return
-    endif
+     if (n_elements(strcompress(head, /remove_all)) LT 2) then begin
+        phast_message, 'File does not appear to be a valid FITS image!', $
+                       window = window, msgtype = 'error'
+        goto, skipfile
+     endif
+     if (!ERR EQ -1) then begin
+        phast_message, $
+           'Selected file does not appear to be a valid FITS image!', $
+           msgtype = 'error', window = window
+        goto, skipfile
+     endif
     
     ; Find out if this is a fits extension file, and how many extensions
     ; New: use fits_open rather than fits_info
-    fits_open, fitsfile, fcb, message = message
-    if (message NE '') then begin
-      phast_message, message, msgtype='error', /window
-      return
-    end
-    numext = fcb.nextend
-    fits_close, fcb
-    
-       instrume = strcompress(string(sxpar(head, 'INSTRUME')), /remove_all)
-    origin = strcompress(sxpar(head, 'ORIGIN'), /remove_all)
-    naxis = sxpar(head, 'NAXIS')
-    
+     fits_open, fitsfile[i], fcb, message = message
+     if (message NE '') then begin
+        phast_message, message, msgtype='error', /window
+        return
+     end
+     numext = fcb.nextend
+     fits_close, fcb
+     
+     instrume = strcompress(string(sxpar(head, 'INSTRUME')), /remove_all)
+     origin = strcompress(sxpar(head, 'ORIGIN'), /remove_all)
+     naxis = sxpar(head, 'NAXIS')
+     
     ; Make sure it's not a 1-d spectrum
-    if (numext EQ 0 AND naxis LT 2) then begin
-      phast_message, 'Selected file is not a 2-d FITS image!', $
-        window = window, msgtype = 'error'
-      return
-    endif
+     if (numext EQ 0 AND naxis LT 2) then begin
+        phast_message, 'Selected file is not a 2-d FITS image!', $
+                       window = window, msgtype = 'error'
+        return
+     endif
 
-    state.title_extras = ''
+     state.title_extras = ''
     
     ; Now call the subroutine that knows how to read in this particular
     ; data format:
     
-    checkfz = strmid(fitsfile, 2, /reverse_offset)
+     checkfz = strmid(fitsfile[i], 2, /reverse_offset)
   
 
-    if ((checkfz EQ '.fz')) then begin
-      phast_fpack_read, fitsfile, numext, head, cancelled
-    endif else if ((numext GT 0) AND (instrume NE 'WFPC2')) then begin
-      phast_fitsext_read, fitsfile, numext, head, cancelled, newimage=newimage
-    endif else if ((instrume EQ 'WFPC2') AND (naxis EQ 3)) then begin
-      phast_wfpc2_read, fitsfile, head, cancelled
-    endif else if ((naxis EQ 3) AND (origin EQ '2MASS')) then begin
-      phast_2mass_read, fitsfile, head, cancelled
-    endif else begin
-      if not keyword_set(refresh_toggle) then begin
-        phast_plainfits_read, fitsfile, head, cancelled, newimage = newimage
-      endif else phast_plainfits_read, fitsfile, head, cancelled, /refresh_toggle, refresh_index = index, newimage=newimage
-    endelse
-    
-    if (cancelled EQ 1) then begin
-      newimage = 0
-      return
-    endif
-    
+     if ((checkfz EQ '.fz')) then begin
+        phast_fpack_read, fitsfile[i], numext, head, cancelled
+     endif else if ((numext GT 0) AND (instrume NE 'WFPC2')) then begin
+        phast_fitsext_read, fitsfile[i], numext, head, cancelled, newimage=newimage
+     endif else if ((instrume EQ 'WFPC2') AND (naxis EQ 3)) then begin
+        phast_wfpc2_read, fitsfile[i], head, cancelled
+     endif else if ((naxis EQ 3) AND (origin EQ '2MASS')) then begin
+        phast_2mass_read, fitsfile[i], head, cancelled
+     endif else begin
+        if not keyword_set(refresh_toggle) then begin
+           phast_plainfits_read, fitsfile[i], head, cancelled, newimage = newimage
+        endif else phast_plainfits_read, fitsfile[i], head, cancelled, /refresh_toggle, refresh_index = index, newimage=newimage
+     endelse
+     
+     if (cancelled EQ 1) then begin
+        newimage = 0
+        return
+     endif
+     
     ; check for 2d image or 3d cube, and store the header if all is well:
-    s = (size(main_image))[0]
-    case s of
-      2: begin
-        phast_setheader, head
-        main_image_cube = 0
-        state.cube = 0
-        state.nslices = 0
-        phast_killcube
-      end
-      3: begin
-        main_image_cube = main_image
-        main_image = 0
-        state.cube = 1
-        phast_setheader, head
-        phast_initcube
-      end
-      else: begin
-        phast_message, 'Selected file is not a 2-D fits image!', $
-          msgtype = 'error', window = window
-        main_image_cube = 0
-        main_image = fltarr(512, 512)
-        newimage = 1
-        state.cube = 0
-        state.nslices = 0
-        phast_killcube
-        head = ''
-        phast_setheader, head
-        fitsfile = ''
-      end
-    endcase
-    widget_control, /hourglass
-    
-    state.imagename = fitsfile
-  ;newimage = 1
-    
-  endif
+     s = (size(main_image))[0]
+     case s of
+        2: begin
+           phast_setheader, head
+           main_image_cube = 0
+           state.cube = 0
+           state.nslices = 0
+           phast_killcube
+        end
+        3: begin
+           main_image_cube = main_image
+           main_image = 0
+           state.cube = 1
+           phast_setheader, head
+           phast_initcube
+        end
+        else: begin
+           phast_message, 'Selected file is not a 2-D fits image!', $
+                          msgtype = 'error', window = window
+           main_image_cube = 0
+           main_image = fltarr(512, 512)
+           newimage = 1
+           state.cube = 0
+           state.nslices = 0
+           phast_killcube
+           head = ''
+           phast_setheader, head
+           fitsfile = ''
+        end
+     endcase
+     skipfile:
+     progress_bar->update,float(i)/num_new_images*100
+  endfor     
+  progress_bar->destroy
+  state.imagename = fitsfile[-1] ;last image is visible
 end
 
 ;---------------------------------------------------------------------
