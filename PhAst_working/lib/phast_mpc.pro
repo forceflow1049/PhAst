@@ -62,6 +62,8 @@ common phast_mpc_data
 
 widget_control, /hourglass
 
+if mpc.site_code eq '000' then print, 'Warning: Using observatory code 000 (Greenwich).  Are you sure this is the correct location?'
+
 ;convert date
 hour = 1./24 ;1 hour in JD
 start = date - hour
@@ -75,7 +77,7 @@ finish_split = strsplit(finish_str,'-:T',/extract)
 tries = 0 ; allow user to self-enter name once
 while 1 eq 1 do begin
    tries++
-   query = 'http://newton.dm.unipi.it/neodys/index.php?pc=1.1.3.1&n='+strcompress(name,/remove_all)+'&oc='+strtrim(string(mpc.site_code),1)+'&y0='+start_split[0]+'&m0='+start_split[1]+'&d0='+start_split[2]+'&h0='+start_split[3]+'&mi0='+start_split[4]+'&y1='+finish_split[0]+'&m1='+finish_split[1]+'&d1='+finish_split[2]+'&h1='+finish_split[3]+'&mi1='+finish_split[4]+'&ti=1.0&tiu=minutes'
+   query = 'http://newton.dm.unipi.it/neodys/index.php?pc=1.1.3.1&n='+strcompress(name,/remove_all)+'&oc='+mpc.site_code+'&y0='+start_split[0]+'&m0='+start_split[1]+'&d0='+start_split[2]+'&h0='+start_split[3]+'&mi0='+start_split[4]+'&y1='+finish_split[0]+'&m1='+finish_split[1]+'&d1='+finish_split[2]+'&h1='+finish_split[3]+'&mi1='+finish_split[4]+'&ti=1.0&tiu=minutes'
    
    a = webget(query)
    

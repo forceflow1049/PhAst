@@ -139,7 +139,7 @@ pro phast_initcommon, phast_dir, launch_dir, small
     telescope:'', $         ;telescope name
     note1: '', $            ;MPC note 1
     note2: '', $            ;MPC note 2
-    site_code:0,$           ;MPC site code
+    site_code:'000',$       ;MPC site code
     measurer:'', $          ;list of measurers
     observers:'', $         ;list of observer names
     contact_name:'', $      ;MPC contact name
@@ -164,9 +164,9 @@ pro phast_initcommon, phast_dir, launch_dir, small
     }
     
   state = {                $
-    tb_mpc_toggle: 1, $    ;is the MPC toolbox opened?
+    tb_mpc_toggle: 0, $    ;is the MPC toolbox opened?
     mpc_box_id: 0L, $      ;Widget ID for MPC toolbox
-    tb_mpc_visible: 1, $   ;is the MPC toolbox drawn?
+    tb_mpc_visible: 0, $   ;is the MPC toolbox drawn?
     batch_astrometry_toggle_state:1,$;is batch astro base visible?
     batch_astrometry_base:0L,$;Widget ID of batch astrometry base
     batch_astrometry_toggle:0L,$;button to show/hide batch astro settings
@@ -564,6 +564,9 @@ pro phast_initcommon, phast_dir, launch_dir, small
      state.tb_overlay_toggle = 0
      state.tb_spice_toggle = 0
      state.tb_blink_toggle = 0
+     state.tb_mpc_toggle = 0
+     state.phot_rad_plot_open = 0
+     state.draw_window_size[0] = 600L
      state.draw_window_size[1] = 450L
   endif
 

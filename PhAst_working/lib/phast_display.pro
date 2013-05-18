@@ -2821,8 +2821,8 @@ pro phast_resize
   window = (state.base_min_size > tmp_event)
   
   newbase = window - state.base_pad
-  newxsize = (tmp_event[0] - state.base_pad[0]) > 800; (state.base_min_size[0] - state.base_pad[0])
-  newysize = (tmp_event[1] - state.base_pad[1]) > 400;> $
+  newxsize = (tmp_event[0] - state.base_pad[0]) > 600; (state.base_min_size[0] - state.base_pad[0])
+  newysize = (tmp_event[1] - state.base_pad[1]) > 300;> $
   ;  (state.base_min_size[1] - state.base_pad[1])
   
   

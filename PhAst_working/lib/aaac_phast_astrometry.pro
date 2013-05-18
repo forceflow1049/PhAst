@@ -33,43 +33,43 @@ end
 
 ;----------------------------------------------------------------------
 
-pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul
+pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul, astr=astr, header=head,image_width=image_width,image_height=image_height,pixelscale=pixelscale
   ; get common specs for image
 
   common phast_state
   common phast_images
 
-  if ptr_valid(state.astr_ptr) then begin
-     xy2ad,state.image_size[0]/2,state.image_size[1]/2,*(state.astr_ptr),a0,d0 ; center
-     xy2ad,state.image_size[0]  ,state.image_size[1]  ,*(state.astr_ptr),a1,d1 ; corner
-  endif else begin
-     RA = sxpar(*state.head_ptr,'RA')  &  a = ten(RA)/15.0
-     Dec = sxpar(*state.head_ptr,'DEC') &  d = ten(Dec)
-  endelse
-  radius = state.pixelscale * sqrt( (state.image_size[0]/2)^2 + (state.image_size[1]/2)^2 ) / 60.0
-  X = sxpar(*state.head_ptr,'AIRMASS')  >  0.00 ; use X=0.0 if AIRMASS not present
-  if image_archive[state.current_image_index]->get_obs_date() eq 0 then begin
+  if not keyword_set(pixelscale) then pixelscale = state.pixelscale
+  if not keyword_set(image_width) then image_width = state.image_size[0]
+  if not keyword_set(image_height) then image_height = state.image_size[1]
+  if not keyword_set(astr) then astr = *state.astr_ptr
+  if not keyword_set(head) then head = *state.head_ptr
   
-     timestr = sxpar(*state.head_ptr,'UT',count=count)
-     if count ne 0 then begin
-        HH =  long(strmid(timestr,0,2))
-        Min =  long(strmid(timestr,3,2))
-        Sec = float(strmid(timestr,6))
-     endif
-     datestr = sxpar(*state.head_ptr,'DATE-OBS',count=count)
-     if count ne 0 then begin
-        YYYY =  long(strmid(datestr,0,4))
-        MM =  long(strmid(datestr,5,2))
-        DD =  long(strmid(datestr,8,2))
-     endif     
-     datejul = JULDAY(MM,DD,YYYY,HH,Min,Sec)
+  if n_elements(astr) ne 0 then begin
+     xy2ad,image_width/2,image_height/2,astr,a0,d0 ; center
+     xy2ad,image_width,image_height,astr,a1,d1 ; corner
+  endif else begin
+     RA = sxpar(head,'RA')  &  a = ten(RA)/15.0
+     Dec = sxpar(head,'DEC') &  d = ten(Dec)
+  endelse
+  radius = pixelscale * sqrt( (image_width/2)^2 + (image_height/2)^2 ) / 60.0
+  X = sxpar(head,'AIRMASS')  >  0.00 ; use X=0.0 if AIRMASS not present
+  if not keyword_set(head) then begin
+     if (image_archive[state.current_image_index]->get_obs_date() eq 0) then begin
+        result = dialog_message("Image must have a valid observation date to retrieve an epoch!",/error,/center)
+        return
+     endif else begin 
+        datejul = image_archive[state.current_image_index]->get_obs_date()
+        date_vec = date_conv(datejul,'V')
+        YYYY = date_vec[0]
+     endelse
   endif else begin 
-     datejul = image_archive[state.current_image_index]->get_obs_date()
+     datejul = phast_get_obs_time(head)
      date_vec = date_conv(datejul,'V')
      YYYY = date_vec[0]
   endelse
-     exptime = float(sxpar(*state.head_ptr,'EXPTIME'))
-     datejul = datejul + 0.5*exptime/3600./24.
+  exptime = float(sxpar(head,'EXPTIME'))
+  datejul = datejul + 0.5*exptime/3600./24.
   frac = (datejul-julday(01,01,YYYY,00,00,00))/365.0 ; julian year
   obsDate = float(YYYY)+frac
 end
@@ -106,7 +106,7 @@ function phast_get_stars, a, d, radius, AsOf=AsOf, catalog_name=catalog_name
 ;routine to retrieve stars from an outside catalog and format into phast structure
   
   common phast_state
-    
+
   if ~keyword_set(catalog_name) then catalog_name = state.catalog_name
   widget_control, /hourglass    ; initial load could take some time
   
@@ -226,13 +226,13 @@ function phast_get_stars, a, d, radius, AsOf=AsOf, catalog_name=catalog_name
      end
      
      'Landolt': begin
-      if file_test('./landolt_usno.1.dat') eq 0 then begin
+      if file_test(state.phast_dir+'/landolt_usno.1.dat') eq 0 then begin
          print, 'Landolt catalog not found in ./PhAst root directory'
          print, '    ... download landolt_usno.1.dat from http://web.pd.astro.it/blanc/landolt/landolt.html'
       endif else begin
          
          ;star_catalog = queryvizier('Landolt',[a,d],radius*expand,/ALLCOLUMNS) astrometry is poor
-         readcol, './landolt_usno.1.dat', starID, RA, Dec, Vmag, BmV, UmB, VmR, RmI, VmI, NObs, Nites, e_VMag, e_BmV, e_UmB, e_VmR, e_RmI, e_VmI, $
+         readcol, phast_dir+'/landolt_usno.1.dat', starID, RA, Dec, Vmag, BmV, UmB, VmR, RmI, VmI, NObs, Nites, e_VMag, e_BmV, e_UmB, e_VmR, e_RmI, e_VmI, $
                   delimiter=',', format='A,A,A,F,F,F,F,F,F,I,I,F,F,F,F,F,F'
          
          if n_elements(starID) le 0 then begin

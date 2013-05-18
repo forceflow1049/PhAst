@@ -234,35 +234,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   ;Extract information about image to store in the image object
 
   ;get date of observation
-  while (1 eq 1) do begin ;choose only one
-     mjd = sxpar(head,'MJD-OBS',count=count)
-     if count ne 0 then begin
-        jd = double(mjd) + 2400000.5d
-        image_archive[state.num_images-1]->set_obs_date,jd
-        break
-     endif
-     jd = sxpar(head,'JD',count=count)
-     if count ne 0 then begin
-        if long(jd) gt 240000 then begin
-           image_archive[state.num_images-1]->set_obs_date,jd
-           break
-        endif else print, 'Warning: FITS keyword JD appears incorrect.  Trying other methods.'
-     endif
-     datestr = sxpar(head,'DATE-OBS',count=date_count)
-     timestr = sxpar(head,'UT',count=time_count)
-     if (date_count ne 0) and (time_count ne 0) then begin
-        YYYY =  long(strmid(datestr,0,4))
-        MM =  long(strmid(datestr,5,2))
-        DD =  long(strmid(datestr,8,2))
-        HH =  long(strmid(timestr,0,2))
-        Min =  long(strmid(timestr,3,2))
-        Sec = float(strmid(timestr,6))
-        image_archive[state.num_images-1]->set_obs_date, JULDAY(MM,DD,YYYY,HH,Min,Sec)
-        break
-     endif
-     print, 'Supported date keyword not found in FITS header.'
-     break
-  endwhile
+  image_archive[state.num_images-1]->set_obs_date,phast_get_obs_time(head)
   ;get the name of the object observed
   obj_name = sxpar(head,'OBJECT',count=count)
   if count ne 0 then begin
@@ -2180,6 +2152,7 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
      if (fitsloc EQ '') then return ; 'cancel' button returns empty string
   endif else begin
      fitsfile = fitsfilename
+     num_new_images = 1
   endelse
   
   ;if adding a directory, expand the archive
@@ -2305,97 +2278,103 @@ pro phast_read_config
     readcol,state.phast_dir+'phast.conf',var,val,FORMAT='A,A',/silent,delim=string(9b),comment='#'
     for i=0, n_elements(var)-1 do begin
       case strlowcase(strtrim(var[i])) of
-        ;calibration
-        'bias_file': begin
-          state.bias_filename = val[i]
-          fits_read,state.bias_filename,cal_bias,cal_flat_head
-          state.bias_toggle = 1
-        end
-        'dark_file': begin
-          state.dark_filename = val[i]
-          fits_read,state.dark_filename,cal_dark,cal_dark_head
-          state.dark_toggle = 1
-        end
-        'flat_file': begin
-          state.flat_filename = val[i]
-          fits_read,state.flat_filename,cal_flat,cal_flat_head
-          state.flat_toggle = 1
-        end
-        'overscan': begin
-          state.over_toggle = fix(val[i])
-       end
-        'compute_astrometry': begin
-           state.astrometry_toggle = fix(val[i])
-        end
-        ;sextractor
-        'sex_catalog_path': state.sex_catalog_path = val[i]
-        'sex_flags': state.sex_flags = val[i]
-        ;scamp
-        'scamp_flags': state.scamp_flags = val[i]
-        ;missfits
-        'missfits_flags': state.missfits_flags = val[i]
-        ;blink control
-        'animate_speed': state.animate_speed = float(val[i])
-        'tb_blink_toggle': state.tb_blink_toggle = fix(val[i])
-        'tb_blink_visible': state.tb_blink_visible = fix(val[i])
-        'animate_type': state.animate_type = val[i]
-        ;star overlay
-        'tb_overlay_toggle': state.tb_overlay_toggle = fix(val[i])
-        'tb_overlay_visible': state.tb_overlay_visible = fix(val[i])
-        ;SPICE control
-        'tb_spice_toggle': state.tb_spice_toggle = fix(val[i])
-        'tb_spice_visible': state.tb_spice_visible = fix(val[i])
-        'kernel_list': state.kernel_list = val[i]
-        ;calibration
-        'cal_file_name': state.cal_file_name = val[i]
-        ;photometery
-        'photfilename': state.photfilename = val[i]
-        'aprad': state.aprad = float(val[i])
-        'innersky': state.innersky = float(val[i])
-        'outersky': state.outersky = float(val[i])
-        'seeing': state.objfwhm = float(val[i])
-        'pixelscale': state.pixelscale = float(val[i])
-        'ccdgain': state.ccdgain = float(val[i])
-        'ccdrn': state.ccdrn = float(val[i])
-        'photerrors': state.photerrors = fix(val[i])
-        'skytype': state.skytype = fix(val[i])
-        'magunits': state.magunits = fix(val[i])
-        'phot_rad_plot_open': state.phot_rad_plot_open = fix(val[i])
-        'ccdrotangle': begin
-          state.fits_crota1 = float(val[i])
-          state.fits_crota2 = float(val[i])
-          state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
-          state.fits_cdelt2 = -state.fits_cdelt1
-        end
-        ;MPC reporting
-        'mpc_net': mpc.net = val[i]
-        'mpc_com': mpc.com = val[i]
-        'mpc_ack': mpc.ack = val[i]
-        'mpc_note1': mpc.note1 = val[i]
-        'mpc_note2': mpc.note2 = val[i]
-        'mpc_code': mpc.code = val[i]
-        'mpc_contact_address': mpc.contact_address = val[i]
-        'mpc_contact_email': mpc.contact_email = val[i]
-        'mpc_contact_name': mpc.contact_name = val[i]
-        'mpc_height': mpc.height = float(val[i])
-        'mpc_lat': mpc.lat = float(val[i])
-        'mpc_lat_dir': mpc.lat_dir = val[i]
-        'mpc_lon': mpc.lon = float(val[i])
-        'mpc_lon_dir': mpc.lon_dir = val[i]
-        'mpc_observers': mpc.observers = val[i]
-        'mpc_measurer': mpc.measurer = val[i]
-        'mpc_site_code': mpc.site_code = fix(val[i])
-        'mpc_telescope': mpc.telescope = val[i]
-        ;other
-        'align_toggle': state.align_toggle = fix(val[i])
-        'check_updates':state.check_updates = fix(val[i])
-        'invert_colormap': state.invert_colormap = fix(val[i])
-        
-        
-        else: print, 'Parameter '+var[i]+' not found in phast_state!'
+                                ;calibration
+         'bias_file': begin
+            state.bias_filename = val[i]
+            fits_read,state.bias_filename,cal_bias,cal_flat_head
+            state.bias_toggle = 1
+         end
+         'dark_file': begin
+            state.dark_filename = val[i]
+            fits_read,state.dark_filename,cal_dark,cal_dark_head
+            state.dark_toggle = 1
+         end
+         'flat_file': begin
+            state.flat_filename = val[i]
+            fits_read,state.flat_filename,cal_flat,cal_flat_head
+            state.flat_toggle = 1
+         end
+         'overscan': begin
+            state.over_toggle = fix(val[i])
+         end
+         'compute_astrometry': begin
+            state.astrometry_toggle = fix(val[i])
+         end
+                                ;sextractor
+         'sex_catalog_path': state.sex_catalog_path = val[i]
+         'sex_flags': state.sex_flags = val[i]
+                                ;scamp
+         'scamp_flags': state.scamp_flags = val[i]
+                                ;missfits
+         'missfits_flags': state.missfits_flags = val[i]
+                                ;swarp
+         'swarp_flags': state.swarp_flags = val[i]
+                                ;blink control
+         'animate_speed': state.animate_speed = float(val[i])
+         'tb_blink_toggle': state.tb_blink_toggle = fix(val[i])
+         'tb_blink_visible': state.tb_blink_visible = fix(val[i])
+         'animate_type': state.animate_type = val[i]
+                                ;star overlay
+         'tb_overlay_toggle': state.tb_overlay_toggle = fix(val[i])
+         'tb_overlay_visible': state.tb_overlay_visible = fix(val[i])
+                                ;SPICE control
+         'tb_spice_toggle': state.tb_spice_toggle = fix(val[i])
+         'tb_spice_visible': state.tb_spice_visible = fix(val[i])
+         'kernel_list': state.kernel_list = val[i]
+                                ;MPC tools
+         'tb_mpc_toggle': state.tb_mpc_toggle = fix(val[i])
+         'tb_mpc_visible': state.tb_mpc_visible = fix(val[i])
+                                ;calibration
+         'cal_file_name': state.cal_file_name = val[i]
+                                ;photometery
+         'photfilename': state.photfilename = val[i]
+         'aprad': state.aprad = float(val[i])
+         'innersky': state.innersky = float(val[i])
+         'outersky': state.outersky = float(val[i])
+         'seeing': state.objfwhm = float(val[i])
+         'pixelscale': state.pixelscale = float(val[i])
+         'ccdgain': state.ccdgain = float(val[i])
+         'ccdrn': state.ccdrn = float(val[i])
+         'photerrors': state.photerrors = fix(val[i])
+         'skytype': state.skytype = fix(val[i])
+         'magunits': state.magunits = fix(val[i])
+         'phot_rad_plot_open': state.phot_rad_plot_open = fix(val[i])
+         'ccdrotangle': begin
+            state.fits_crota1 = float(val[i])
+            state.fits_crota2 = float(val[i])
+            state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
+            state.fits_cdelt2 = -state.fits_cdelt1
+         end
+                                ;MPC reporting
+         'mpc_net': mpc.net = val[i]
+         'mpc_com': mpc.com = val[i]
+         'mpc_ack': mpc.ack = val[i]
+         'mpc_note1': mpc.note1 = val[i]
+         'mpc_note2': mpc.note2 = val[i]
+         'mpc_code': mpc.code = val[i]
+         'mpc_contact_address': mpc.contact_address = val[i]
+         'mpc_contact_email': mpc.contact_email = val[i]
+         'mpc_contact_name': mpc.contact_name = val[i]
+         'mpc_height': mpc.height = float(val[i])
+         'mpc_lat': mpc.lat = float(val[i])
+         'mpc_lat_dir': mpc.lat_dir = val[i]
+         'mpc_lon': mpc.lon = float(val[i])
+         'mpc_lon_dir': mpc.lon_dir = val[i]
+         'mpc_observers': mpc.observers = val[i]
+         'mpc_measurer': mpc.measurer = val[i]
+         'mpc_site_code': mpc.site_code = val[i]
+         'mpc_telescope': mpc.telescope = val[i]
+                                ;other
+         'align_toggle': state.align_toggle = fix(val[i])
+         'check_updates':state.check_updates = fix(val[i])
+         'invert_colormap': state.invert_colormap = fix(val[i])
+         'mousemode': state.mousemode = val[i]
+         
+         
+         else: print, 'Parameter '+var[i]+' not found in phast_state!'
       endcase
-    endfor
-    ;
+   endfor
+                                ;
     ;now, process any state defaults based on inputs
     if state.pixelscale le 0 then begin
        print, 'Warning: CCD pixel scale has not been set.  Defaulting to 1.0" per pixel.'
@@ -3221,7 +3200,10 @@ pro phast_startup, phast_dir, launch_dir, small
                               tooltip='Previous image')
   right_button = widget_button(right_top_box,value='--->', uvalue='right_button',$
                                tooltip='Next image')
-  state.tab_bar_id = widget_tab(right_top_box,xsize=500,uvalue='tab_list')
+  if keyword_set(small) then begin
+     tab_size = 300
+  endif else tab_size = 500
+  state.tab_bar_id = widget_tab(right_top_box,xsize=tab_size,uvalue='tab_list')
   state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
   align_toggle_box = widget_base(right_top_box,/nonexclusive)
   state.align_toggle_button = widget_button(align_toggle_box,value='Align images',uvalue='align_toggle',tooltip='Align images using WCS coordinates')
@@ -3279,7 +3261,7 @@ pro phast_startup, phast_dir, launch_dir, small
   state.mode_droplist_id = widget_droplist(modebase, $
                                      uvalue = 'mode', $
                                      value = modelist)
-  widget_control,state.mode_droplist_id,set_droplist_select=3  
+  widget_control,state.mode_droplist_id,set_droplist_select=where(strlowcase(modelist) eq strlowcase(state.mousemode))
   
   button_base1 = widget_base(buttonbar_base, /column,/base_align_center)
   button_base2 = widget_base(buttonbar_base, /column,/base_align_center)
@@ -3411,10 +3393,10 @@ pro phast_startup, phast_dir, launch_dir, small
      overlay_ephem = widget_button(mpc_button_box_1,value='Overlay Ephemeris',uvalue='overlay_ephem')
   endif
   
-  ; Set widget y size for small screens
-  state.draw_window_size[1] = state.draw_window_size[1] < $
-                              (state.screen_ysize - 300)
-  
+  ;; state.draw_window_size[1] = state.draw_window_size[1] < $
+  ;;                             (state.screen_ysize - 300)
+
+
   state.draw_widget_id = widget_draw(state.draw_base_id, $
                                      uvalue = 'draw_window', $
                                      /motion_events,  /button_events, $
@@ -3436,6 +3418,7 @@ pro phast_startup, phast_dir, launch_dir, small
   if state.tb_overlay_toggle eq 0 and state.tb_overlay_visible eq 1 then widget_control,state.overlay_stars_box_id,ysize=1
   if state.tb_blink_toggle eq 0 and state.tb_blink_visible eq 1 then widget_control,state.blink_base_id,ysize=1
   if state.tb_spice_toggle eq 0 and state.tb_spice_visible eq 1 then widget_control,state.spice_box_id,ysize=1
+  if state.tb_mpc_toggle eq 0 and state.tb_mpc_visible eq 1 then widget_control, state.mpc_box_id, ysize=1
   
   
   ; get the window ids for the draw widgets
@@ -3626,8 +3609,8 @@ pro phast_topmenu_event, event
         phast_remove_image,/all
      end
      'Clear output directory': begin
-        result = dialog_message('Empty ./output/images/ ?  This will remove all files from this directory',/question,/center)
-        if result eq 'Yes' then spawn, 'rm ./output/images/*'
+        result = dialog_message('Empty output/images/ ?  This will remove all files from this directory',/question,/center)
+        if result eq 'Yes' then spawn, 'rm '+state.phast_dir+'/output/images/*'
      end
      'Refresh current image': phast_refresh_image,state.current_image_index,state.imagename
      'Refresh all images': for i=0, state.num_images-1 do phast_refresh_image,i,image_archive[i]->get_name()

@@ -203,58 +203,26 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   common phast_images
   if not keyword_set(refresh_toggle) then begin ;normal image adding
      new_image_size = size(new_image)
-     if not keyword_set(dir_add) then begin
-        if state.num_images gt 0 then begin ;check not first image
-           state.num_images++
-           if state.num_images gt state.archive_size then phast_expand_archive
-           image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
-           image_archive[state.num_images-1]->set_image, new_image
-           image_archive[state.num_images-1]->set_name, filename
-           image_archive[state.num_images-1]->set_header, head, /string
-           image_archive[state.num_images-1]->set_rotation,0.0
-           phast_setheader,head
-           newimage = 1
-           state.current_image_index = state.num_images-1
-        endif else begin        ;handle first image add
-           state.num_images++
-           image_archive[0] = obj_new('phast_image') ;create new image object
-           image_archive[0]->set_image, new_image
-           image_archive[0]->set_name, filename
-           image_archive[0]->set_header, head, /string
-           image_archive[0]->set_rotation,0.0
-           newimage = 1
-        endelse
-     endif else begin           ;handle directory add
-        if keyword_set(dir_num) then begin
-           ;; if state.num_images gt 0 then begin
-              phast_expand_archive, num=dir_num
-              image_archive[state.num_images] = obj_new('phast_image') ;create new image object
-              image_archive[state.num_images]->set_image, new_image
-              image_archive[state.num_images]->set_name, filename
-              image_archive[state.num_images]->set_header, head, /string
-              image_archive[state.num_images]->set_rotation,0.0
-              state.num_images++
-              newimage = 1
-           ;; endif else begin     ;handle first image add
-           ;;    state.num_images++
-           ;;    image_archive[0] = obj_new('phast_image') ;create new image object
-           ;;    image_archive[0]->set_image, new_image
-           ;;    image_archive[0]->set_name, filename
-           ;;    image_archive[0]->set_header, head
-           ;;    image_archive[0]->set_rotation,0.0
-           ;;    newimage = 1
-           ;; endelse
-        endif else begin
-           image_archive[state.num_images] = obj_new('phast_image') ;create new image object
-           image_archive[state.num_images]->set_image, new_image
-           image_archive[state.num_images]->set_name, filename
-           image_archive[state.num_images]->set_header, head, /string
-           image_archive[state.num_images]->set_rotation,0.0
-           state.num_images++
-        endelse
+     if state.num_images gt 0 then begin ;check not first image
+        state.num_images++
+        if state.num_images gt state.archive_size then phast_expand_archive
+        image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
+        image_archive[state.num_images-1]->set_image, new_image
+        image_archive[state.num_images-1]->set_name, filename
+        image_archive[state.num_images-1]->set_header, head, /string
+        image_archive[state.num_images-1]->set_rotation,0.0
+        phast_setheader,head
+        newimage = 1
         state.current_image_index = state.num_images-1
-     endelse
-     
+     endif else begin           ;handle first image add
+        state.num_images++
+        image_archive[0] = obj_new('phast_image') ;create new image object
+        image_archive[0]->set_image, new_image
+        image_archive[0]->set_name, filename
+        image_archive[0]->set_header, head, /string
+        image_archive[0]->set_rotation,0.0
+        newimage = 1
+     endelse  
   endif else begin              ;handle image refresh
      image_archive[refresh]->set_image, new_image
      image_archive[refresh]->set_name, filename
@@ -266,20 +234,12 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   ;Extract information about image to store in the image object
 
   ;get date of observation
-  while (1 eq 1) do begin ;choose only one
-     mjd = sxpar(head,'MJD-OBS',count=count)
-     if count ne 0 then begin
-        image_archive[state.num_images-1]->set_obs_date,mjd
-        break
-     endif
-     mjd = sxpar(head,'JD',count=count)
-     if count ne 0 then begin
-        image_archive[state.num_images-1]->set_obs_date,mjd
-        break
-     endif
-     print, 'Supported date keyword not found in FITS header.'
-     break
-  endwhile
+  image_archive[state.num_images-1]->set_obs_date,phast_get_obs_time(head)
+  ;get the name of the object observed
+  obj_name = sxpar(head,'OBJECT',count=count)
+  if count ne 0 then begin
+     image_archive[state.num_images-1]->set_obj_name, obj_name
+  endif
         
   ;update widgets
   ;if not keyword_set(refresh_toggle) then widget_control,state.image_counter_id,set_value='Cycle images: '+ strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
@@ -294,6 +254,7 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
 
   ;add a new tab for the image.
   state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
+  widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
   ;remove the 'no images loaded' tab, if present
   if (state.num_images eq 1) and (n_elements(state.tab_list) gt 1) then widget_control,state.tab_list.remove(0),/destroy
 end
@@ -687,7 +648,7 @@ pro phast_draw_color_event, event
      end
   endcase
   
-  widget_control, state.draw_widget_id, /sensitive ;, /input_focus  
+  widget_control, state.draw_widget_id, /sensitive, /input_focus  
 end
 
 ;--------------------------------------------------------------------
@@ -717,7 +678,7 @@ pro phast_draw_event, event
      phast_draw_keyboard_event, event
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+     widget_control, state.draw_widget_id, /sensitive, /input_focus
           
 end
 
@@ -804,7 +765,7 @@ pro phast_draw_keyboard_event, event
   endif 
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+     widget_control, state.draw_widget_id, /sensitive, /input_focus
   
 end
 
@@ -888,7 +849,7 @@ pro phast_draw_phot_event, event
   
   if (event.type EQ 2) then phast_draw_motion_event, event
   
-  widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+  widget_control, state.draw_widget_id, /sensitive, /input_focus
 end
 
 ;----------------------------------------------------------------------
@@ -994,7 +955,7 @@ pro phast_draw_zoom_event, event
   if (event.type EQ 2) then phast_draw_motion_event, event
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+     widget_control, state.draw_widget_id, /sensitive, /input_focus
 end
 
 ;--------------------------------------------------------------------
@@ -1184,13 +1145,67 @@ pro phast_event, event
            state.tb_mpc_toggle = 0
         endelse
      end
+     'create_mpc_report': phast_mpc_report
      'overlay_ephem': begin
-        ;get the name of the current object
-        name = image_archive[state.current_image_index]->get_obj_name()
-        ;get the date of the observation
-        mjd = image_archive[state.current_image_index]->get_obs_date()
+        if image_archive[state.current_image_index]->astr_valid() then begin
+           ;get the name of the current object
+           name = image_archive[state.current_image_index]->get_obj_name()
+           ;get the date of the observation
+           jd = image_archive[state.current_image_index]->get_obs_date()
+           ;query MPC for ephemeris
+           result = phast_get_mpc_ephem(name,jd)
+           if n_elements(result) eq 0 then return
+
+           ;errors must be at least as big as the seeing
+           result[2] = result[2] > state.phot_aperFWHM/60/60
+           result[3] = result[3] > state.phot_aperFWHM/60/60
+
+           ;plot the line
+
+           ;convert to xy coords and plot
+           size = n_elements(result[0])
+           ad2xy, (result[0])[0],(result[1])[0],*state.astr_ptr,x0,y0
+           ad2xy, (result[0])[-1],(result[1])[-1],*state.astr_ptr,x1,y1
+           ad2xy, (result[0])[size/2],(result[1])[size/2],*state.astr_ptr,xc,yc
+           nplot++
+           line1_str = 'line' + '(' + strtrim(string(x0),1) + ', ' + strtrim(string(y0),1) + ', ' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1)+') # color=green'
+           options = {color: 'green', thick:1}
+           options.color = phast_icolor(options.color)
+           pstruct = {type:'region', $      ;type of plot
+                      reg_array:[line1_str], $ ;region array to plot
+                      options: options $
+                     }
+           plot_ptr[nplot] = ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region, nplot
+           nplot++
+           line2_str = 'line' + '(' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1) + ', ' + strtrim(string(x1),1) + ', ' + strtrim(string(y1),1)+') # color=green'
+           pstruct = {type:'region', $      ;type of plot
+                      reg_array:[line2_str], $ ;region array to plot
+                      options: options $
+                     }
+           plot_ptr[nplot] = ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region, nplot
+           ;plot the ellipse with 3-sigma errors
+           ad2xy, (result[0])[size/2]+3*(result[2])[size/2],(result[1])[size/2]+3*(result[3])[size/2],*state.astr_ptr,right_x,top_y
+           ad2xy, (result[0])[size/2]-3*(result[2])[size/2],(result[1])[size/2]-3*(result[3])[size/2],*state.astr_ptr,left_x,bot_y
+           x_width = abs(right_x-left_x)
+           y_width = abs(top_y-bot_y)
+           nplot++
+           ellipse_str = 'ellipse' + '(' + strtrim(string(xc),1) + ', ' + $
+                         strtrim(string(yc),1) + ', ' + strtrim(string(y_width),1) + ', ' + strtrim(string(x_width),1) + ', ' + strtrim(string((result[4])[size/2]),1)+ ') # color=green'
+           options = {color: 'green', thick:1}
+           options.color = phast_icolor(options.color)
+           pstruct = {type:'region', $        ;type of plot
+                      reg_array:[ellipse_str], $ ;region array to plot
+                      options: options $
+                     }
+           plot_ptr[nplot] = ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region, nplot
+        endif else tmp = dialog_message('You must have an astrometric solution to retrieve an ephemeris!',/error,/center)
      end
-     
      ;align
      'align_toggle': begin
         if state.align_toggle eq 0 then begin
@@ -1475,7 +1490,7 @@ pro phast_image__define
             header_struct: ptr_new(), $ ;holds the image header as a structure
             name:ptr_new(),$    ;holds the file path to the image
             obj_name:ptr_new(),$;name of the object
-            obs_date:ptr_new(),$;obsrvation date in MJD
+            obs_date:ptr_new(),$;obsrvation date in JD
             size:ptr_new(),$    ;contains the size of the image: [x,y]
             astr:ptr_new(),$    ;holds astrometry data, if available
             rotation:ptr_new(),$;holds rotation state of image in deg
@@ -2081,40 +2096,16 @@ pro phast_move_cursor, direction
 end
 
 ;------------------------------------------------------------------
-pro phast_plainfits_read, fitsloc, head, cancelled,dir=dir,refresh_index=index,refresh_toggle=refresh, newimage = newimage
+pro phast_plainfits_read, fitsloc, head, cancelled,refresh_index=index,refresh_toggle=refresh, newimage = newimage
 
   ; Fits reader for plain fits files, no extensions.
 
   common phast_images
   
-  ;main_image=0
-  if keyword_set(dir) then begin
-    fitsfile = findfile(fitsloc+'*.fits')
-    if fitsfile[0] ne '' then begin ;check folder actually contains any images
-      ;read first image and set up directory add
-      fits_read, fitsfile[0],main_image,head
-      head = headfits(fitsfile[0])
-      phast_add_image,main_image,fitsfile[0],head, newimage = newimage, /dir_add, dir_num = n_elements(fitsfile)
-      progress_bar = obj_new('cgprogressbar',title='Opening images')
-      progress_bar->start
-      file_count = n_elements(fitsfile)
-      for i=1, file_count-1 do begin
-         fits_read, fitsfile[i],main_image,head
-         head = headfits(fitsfile[i])
-         phast_add_image,main_image,fitsfile[i],head, newimage = newimage,/dir_add
-         progress_bar->update,float(i)/file_count*100
-      endfor
-      progress_bar->destroy
-    endif else begin
-      newimage = 0 ;if empty, no new image
-      result = dialog_message('Directory contains no FITS images!',/center,/error)
-    endelse
-  endif else begin
-    fits_read, fitsloc, main_image, head
-    if not keyword_set(refresh) then begin
-      phast_add_image,main_image,fitsloc,head, newimage = newimage
-    endif else phast_add_image,main_image,fitsloc,head,refresh_index=index,/refresh_toggle, newimage =newimage
-  endelse
+  fits_read, fitsloc, main_image, head
+  if not keyword_set(refresh) then begin
+     phast_add_image,main_image,fitsloc,head, newimage = newimage
+  endif else phast_add_image,main_image,fitsloc,head,refresh_index=index,/refresh_toggle, newimage =newimage
 end
 
 ;------------------------------------------------------------------
@@ -2137,130 +2128,138 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
   ; If fitsfilename hasn't been passed to this routine, get filename
   ; from dialog_pickfile.
   if (n_elements(fitsfilename) EQ 0) then begin
-    if keyword_set(dir) then begin
-      fitsfile = dialog_pickfile(/read,/directory)
-      if fitsfile ne '' then phast_plainfits_read, fitsfile, head, cancelled, /dir,newimage=newimage ;check for cancel
-    endif else begin
-      fitsfile = $
-        dialog_pickfile( $
-        filter = filterlist, $
-        group = state.base_id, $
-        /must_exist, $
-        /read, $
-        path = state.current_dir, $
-        get_path = tmp_dir, $
-        title = 'Select FITS Image')
-      if (tmp_dir NE '') then state.current_dir = tmp_dir
-      if (fitsfile EQ '') then return ; 'cancel' button returns empty string
-    endelse
+     if keyword_set(dir) then begin
+        fitsloc = dialog_pickfile(/read,/directory,group=state.base_id,path=state.current_dir,get_path=tmp_dir,title='Select a directory with FITS images')
+           fitsfile = findfile(fitsloc+'*.fits',count=num_new_images) 
+           if n_elements(fitsfile) eq 1 then begin
+              result = dialog_message('Directory contains no FITS images!',/center,/error)
+              return
+           endif
+     endif else begin
+        fitsloc = $
+           dialog_pickfile( $
+           filter = filterlist, $
+           group = state.base_id, $
+           /must_exist, $
+           /read, $
+           path = state.current_dir, $
+           get_path = tmp_dir, $
+           title = 'Select FITS Image')
+        num_new_images = 1
+        fitsfile = fitsloc
+     endelse
+     if (tmp_dir NE '') then state.current_dir = tmp_dir
+     if (fitsloc EQ '') then return ; 'cancel' button returns empty string
   endif else begin
-    fitsfile = fitsfilename
+     fitsfile = fitsfilename
   endelse
   
-  
-  if not keyword_set(dir) then begin
-  
+  ;if adding a directory, expand the archive
+  if keyword_set(dir) then phast_expand_archive,num=num_new_images
+
+  progress_bar = obj_new('cgprogressbar',title='Opening images')
+  progress_bar->start
+  for i=0, num_new_images-1 do begin  
     ; Get fits header so we know what kind of image this is.
-    head = headfits(fitsfile)   ;, errmsg = errmsg)
+     head = headfits(fitsfile[i])  ;, errmsg = errmsg)
     
     ; Check validity of fits file header
-    if (n_elements(strcompress(head, /remove_all)) LT 2) then begin
-      phast_message, 'File does not appear to be a valid FITS image!', $
-        window = window, msgtype = 'error'
-      return
-    endif
-    if (!ERR EQ -1) then begin
-      phast_message, $
-        'Selected file does not appear to be a valid FITS image!', $
-        msgtype = 'error', window = window
-      return
-    endif
+     if (n_elements(strcompress(head, /remove_all)) LT 2) then begin
+        phast_message, 'File does not appear to be a valid FITS image!', $
+                       window = window, msgtype = 'error'
+        goto, skipfile
+     endif
+     if (!ERR EQ -1) then begin
+        phast_message, $
+           'Selected file does not appear to be a valid FITS image!', $
+           msgtype = 'error', window = window
+        goto, skipfile
+     endif
     
     ; Find out if this is a fits extension file, and how many extensions
     ; New: use fits_open rather than fits_info
-    fits_open, fitsfile, fcb, message = message
-    if (message NE '') then begin
-      phast_message, message, msgtype='error', /window
-      return
-    end
-    numext = fcb.nextend
-    fits_close, fcb
-    
-       instrume = strcompress(string(sxpar(head, 'INSTRUME')), /remove_all)
-    origin = strcompress(sxpar(head, 'ORIGIN'), /remove_all)
-    naxis = sxpar(head, 'NAXIS')
-    
+     fits_open, fitsfile[i], fcb, message = message
+     if (message NE '') then begin
+        phast_message, message, msgtype='error', /window
+        return
+     end
+     numext = fcb.nextend
+     fits_close, fcb
+     
+     instrume = strcompress(string(sxpar(head, 'INSTRUME')), /remove_all)
+     origin = strcompress(sxpar(head, 'ORIGIN'), /remove_all)
+     naxis = sxpar(head, 'NAXIS')
+     
     ; Make sure it's not a 1-d spectrum
-    if (numext EQ 0 AND naxis LT 2) then begin
-      phast_message, 'Selected file is not a 2-d FITS image!', $
-        window = window, msgtype = 'error'
-      return
-    endif
+     if (numext EQ 0 AND naxis LT 2) then begin
+        phast_message, 'Selected file is not a 2-d FITS image!', $
+                       window = window, msgtype = 'error'
+        return
+     endif
 
-    state.title_extras = ''
+     state.title_extras = ''
     
     ; Now call the subroutine that knows how to read in this particular
     ; data format:
     
-    checkfz = strmid(fitsfile, 2, /reverse_offset)
+     checkfz = strmid(fitsfile[i], 2, /reverse_offset)
   
 
-    if ((checkfz EQ '.fz')) then begin
-      phast_fpack_read, fitsfile, numext, head, cancelled
-    endif else if ((numext GT 0) AND (instrume NE 'WFPC2')) then begin
-      phast_fitsext_read, fitsfile, numext, head, cancelled, newimage=newimage
-    endif else if ((instrume EQ 'WFPC2') AND (naxis EQ 3)) then begin
-      phast_wfpc2_read, fitsfile, head, cancelled
-    endif else if ((naxis EQ 3) AND (origin EQ '2MASS')) then begin
-      phast_2mass_read, fitsfile, head, cancelled
-    endif else begin
-      if not keyword_set(refresh_toggle) then begin
-        phast_plainfits_read, fitsfile, head, cancelled, newimage = newimage
-      endif else phast_plainfits_read, fitsfile, head, cancelled, /refresh_toggle, refresh_index = index, newimage=newimage
-    endelse
-    
-    if (cancelled EQ 1) then begin
-      newimage = 0
-      return
-    endif
-    
+     if ((checkfz EQ '.fz')) then begin
+        phast_fpack_read, fitsfile[i], numext, head, cancelled
+     endif else if ((numext GT 0) AND (instrume NE 'WFPC2')) then begin
+        phast_fitsext_read, fitsfile[i], numext, head, cancelled, newimage=newimage
+     endif else if ((instrume EQ 'WFPC2') AND (naxis EQ 3)) then begin
+        phast_wfpc2_read, fitsfile[i], head, cancelled
+     endif else if ((naxis EQ 3) AND (origin EQ '2MASS')) then begin
+        phast_2mass_read, fitsfile[i], head, cancelled
+     endif else begin
+        if not keyword_set(refresh_toggle) then begin
+           phast_plainfits_read, fitsfile[i], head, cancelled, newimage = newimage
+        endif else phast_plainfits_read, fitsfile[i], head, cancelled, /refresh_toggle, refresh_index = index, newimage=newimage
+     endelse
+     
+     if (cancelled EQ 1) then begin
+        newimage = 0
+        return
+     endif
+     
     ; check for 2d image or 3d cube, and store the header if all is well:
-    s = (size(main_image))[0]
-    case s of
-      2: begin
-        phast_setheader, head
-        main_image_cube = 0
-        state.cube = 0
-        state.nslices = 0
-        phast_killcube
-      end
-      3: begin
-        main_image_cube = main_image
-        main_image = 0
-        state.cube = 1
-        phast_setheader, head
-        phast_initcube
-      end
-      else: begin
-        phast_message, 'Selected file is not a 2-D fits image!', $
-          msgtype = 'error', window = window
-        main_image_cube = 0
-        main_image = fltarr(512, 512)
-        newimage = 1
-        state.cube = 0
-        state.nslices = 0
-        phast_killcube
-        head = ''
-        phast_setheader, head
-        fitsfile = ''
-      end
-    endcase
-    widget_control, /hourglass
-    
-    state.imagename = fitsfile
-  ;newimage = 1
-    
-  endif
+     s = (size(main_image))[0]
+     case s of
+        2: begin
+           phast_setheader, head
+           main_image_cube = 0
+           state.cube = 0
+           state.nslices = 0
+           phast_killcube
+        end
+        3: begin
+           main_image_cube = main_image
+           main_image = 0
+           state.cube = 1
+           phast_setheader, head
+           phast_initcube
+        end
+        else: begin
+           phast_message, 'Selected file is not a 2-D fits image!', $
+                          msgtype = 'error', window = window
+           main_image_cube = 0
+           main_image = fltarr(512, 512)
+           newimage = 1
+           state.cube = 0
+           state.nslices = 0
+           phast_killcube
+           head = ''
+           phast_setheader, head
+           fitsfile = ''
+        end
+     endcase
+     skipfile:
+     progress_bar->update,float(i)/num_new_images*100
+  endfor     
+  progress_bar->destroy
+  state.imagename = fitsfile[-1] ;last image is visible
 end
 
 ;---------------------------------------------------------------------
@@ -2278,97 +2277,103 @@ pro phast_read_config
     readcol,state.phast_dir+'phast.conf',var,val,FORMAT='A,A',/silent,delim=string(9b),comment='#'
     for i=0, n_elements(var)-1 do begin
       case strlowcase(strtrim(var[i])) of
-        ;calibration
-        'bias_file': begin
-          state.bias_filename = val[i]
-          fits_read,state.bias_filename,cal_bias,cal_flat_head
-          state.bias_toggle = 1
-        end
-        'dark_file': begin
-          state.dark_filename = val[i]
-          fits_read,state.dark_filename,cal_dark,cal_dark_head
-          state.dark_toggle = 1
-        end
-        'flat_file': begin
-          state.flat_filename = val[i]
-          fits_read,state.flat_filename,cal_flat,cal_flat_head
-          state.flat_toggle = 1
-        end
-        'overscan': begin
-          state.over_toggle = fix(val[i])
-       end
-        'compute_astrometry': begin
-           state.astrometry_toggle = fix(val[i])
-        end
-        ;sextractor
-        'sex_catalog_path': state.sex_catalog_path = val[i]
-        'sex_flags': state.sex_flags = val[i]
-        ;scamp
-        'scamp_flags': state.scamp_flags = val[i]
-        ;missfits
-        'missfits_flags': state.missfits_flags = val[i]
-        ;blink control
-        'animate_speed': state.animate_speed = float(val[i])
-        'tb_blink_toggle': state.tb_blink_toggle = fix(val[i])
-        'tb_blink_visible': state.tb_blink_visible = fix(val[i])
-        'animate_type': state.animate_type = val[i]
-        ;star overlay
-        'tb_overlay_toggle': state.tb_overlay_toggle = fix(val[i])
-        'tb_overlay_visible': state.tb_overlay_visible = fix(val[i])
-        ;SPICE control
-        'tb_spice_toggle': state.tb_spice_toggle = fix(val[i])
-        'tb_spice_visible': state.tb_spice_visible = fix(val[i])
-        'kernel_list': state.kernel_list = val[i]
-        ;calibration
-        'cal_file_name': state.cal_file_name = val[i]
-        ;photometery
-        'photfilename': state.photfilename = val[i]
-        'aprad': state.aprad = float(val[i])
-        'innersky': state.innersky = float(val[i])
-        'outersky': state.outersky = float(val[i])
-        'seeing': state.objfwhm = float(val[i])
-        'pixelscale': state.pixelscale = float(val[i])
-        'ccdgain': state.ccdgain = float(val[i])
-        'ccdrn': state.ccdrn = float(val[i])
-        'photerrors': state.photerrors = fix(val[i])
-        'skytype': state.skytype = fix(val[i])
-        'magunits': state.magunits = fix(val[i])
-        'phot_rad_plot_open': state.phot_rad_plot_open = fix(val[i])
-        'ccdrotangle': begin
-          state.fits_crota1 = float(val[i])
-          state.fits_crota2 = float(val[i])
-          state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
-          state.fits_cdelt2 = -state.fits_cdelt1
-        end
-        ;MPC reporting
-        'mpc_net': mpc.net = val[i]
-        'mpc_com': mpc.com = val[i]
-        'mpc_ack': mpc.ack = val[i]
-        'mpc_note1': mpc.note1 = val[i]
-        'mpc_note2': mpc.note2 = val[i]
-        'mpc_code': mpc.code = val[i]
-        'mpc_contact_address': mpc.contact_address = val[i]
-        'mpc_contact_email': mpc.contact_email = val[i]
-        'mpc_contact_name': mpc.contact_name = val[i]
-        'mpc_height': mpc.height = float(val[i])
-        'mpc_lat': mpc.lat = float(val[i])
-        'mpc_lat_dir': mpc.lat_dir = val[i]
-        'mpc_lon': mpc.lon = float(val[i])
-        'mpc_lon_dir': mpc.lon_dir = val[i]
-        'mpc_observers': mpc.observers = val[i]
-        'mpc_measurer': mpc.measurer = val[i]
-        'mpc_site_code': mpc.site_code = fix(val[i])
-        'mpc_telescope': mpc.telescope = val[i]
-        ;other
-        'align_toggle': state.align_toggle = fix(val[i])
-        'check_updates':state.check_updates = fix(val[i])
-        'invert_colormap': state.invert_colormap = fix(val[i])
-        
-        
-        else: print, 'Parameter '+var[i]+' not found in phast_state!'
+                                ;calibration
+         'bias_file': begin
+            state.bias_filename = val[i]
+            fits_read,state.bias_filename,cal_bias,cal_flat_head
+            state.bias_toggle = 1
+         end
+         'dark_file': begin
+            state.dark_filename = val[i]
+            fits_read,state.dark_filename,cal_dark,cal_dark_head
+            state.dark_toggle = 1
+         end
+         'flat_file': begin
+            state.flat_filename = val[i]
+            fits_read,state.flat_filename,cal_flat,cal_flat_head
+            state.flat_toggle = 1
+         end
+         'overscan': begin
+            state.over_toggle = fix(val[i])
+         end
+         'compute_astrometry': begin
+            state.astrometry_toggle = fix(val[i])
+         end
+                                ;sextractor
+         'sex_catalog_path': state.sex_catalog_path = val[i]
+         'sex_flags': state.sex_flags = val[i]
+                                ;scamp
+         'scamp_flags': state.scamp_flags = val[i]
+                                ;missfits
+         'missfits_flags': state.missfits_flags = val[i]
+                                ;swarp
+         'swarp_flags': state.swarp_flags = val[i]
+                                ;blink control
+         'animate_speed': state.animate_speed = float(val[i])
+         'tb_blink_toggle': state.tb_blink_toggle = fix(val[i])
+         'tb_blink_visible': state.tb_blink_visible = fix(val[i])
+         'animate_type': state.animate_type = val[i]
+                                ;star overlay
+         'tb_overlay_toggle': state.tb_overlay_toggle = fix(val[i])
+         'tb_overlay_visible': state.tb_overlay_visible = fix(val[i])
+                                ;SPICE control
+         'tb_spice_toggle': state.tb_spice_toggle = fix(val[i])
+         'tb_spice_visible': state.tb_spice_visible = fix(val[i])
+         'kernel_list': state.kernel_list = val[i]
+                                ;MPC tools
+         'tb_mpc_toggle': state.tb_mpc_toggle = fix(val[i])
+         'tb_mpc_visible': state.tb_mpc_visible = fix(val[i])
+                                ;calibration
+         'cal_file_name': state.cal_file_name = val[i]
+                                ;photometery
+         'photfilename': state.photfilename = val[i]
+         'aprad': state.aprad = float(val[i])
+         'innersky': state.innersky = float(val[i])
+         'outersky': state.outersky = float(val[i])
+         'seeing': state.objfwhm = float(val[i])
+         'pixelscale': state.pixelscale = float(val[i])
+         'ccdgain': state.ccdgain = float(val[i])
+         'ccdrn': state.ccdrn = float(val[i])
+         'photerrors': state.photerrors = fix(val[i])
+         'skytype': state.skytype = fix(val[i])
+         'magunits': state.magunits = fix(val[i])
+         'phot_rad_plot_open': state.phot_rad_plot_open = fix(val[i])
+         'ccdrotangle': begin
+            state.fits_crota1 = float(val[i])
+            state.fits_crota2 = float(val[i])
+            state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
+            state.fits_cdelt2 = -state.fits_cdelt1
+         end
+                                ;MPC reporting
+         'mpc_net': mpc.net = val[i]
+         'mpc_com': mpc.com = val[i]
+         'mpc_ack': mpc.ack = val[i]
+         'mpc_note1': mpc.note1 = val[i]
+         'mpc_note2': mpc.note2 = val[i]
+         'mpc_code': mpc.code = val[i]
+         'mpc_contact_address': mpc.contact_address = val[i]
+         'mpc_contact_email': mpc.contact_email = val[i]
+         'mpc_contact_name': mpc.contact_name = val[i]
+         'mpc_height': mpc.height = float(val[i])
+         'mpc_lat': mpc.lat = float(val[i])
+         'mpc_lat_dir': mpc.lat_dir = val[i]
+         'mpc_lon': mpc.lon = float(val[i])
+         'mpc_lon_dir': mpc.lon_dir = val[i]
+         'mpc_observers': mpc.observers = val[i]
+         'mpc_measurer': mpc.measurer = val[i]
+         'mpc_site_code': mpc.site_code = val[i]
+         'mpc_telescope': mpc.telescope = val[i]
+                                ;other
+         'align_toggle': state.align_toggle = fix(val[i])
+         'check_updates':state.check_updates = fix(val[i])
+         'invert_colormap': state.invert_colormap = fix(val[i])
+         'mousemode': state.mousemode = val[i]
+         
+         
+         else: print, 'Parameter '+var[i]+' not found in phast_state!'
       endcase
-    endfor
-    ;
+   endfor
+                                ;
     ;now, process any state defaults based on inputs
     if state.pixelscale le 0 then begin
        print, 'Warning: CCD pixel scale has not been set.  Defaulting to 1.0" per pixel.'
@@ -3194,7 +3199,10 @@ pro phast_startup, phast_dir, launch_dir, small
                               tooltip='Previous image')
   right_button = widget_button(right_top_box,value='--->', uvalue='right_button',$
                                tooltip='Next image')
-  state.tab_bar_id = widget_tab(right_top_box,xsize=500,uvalue='tab_list')
+  if keyword_set(small) then begin
+     tab_size = 300
+  endif else tab_size = 500
+  state.tab_bar_id = widget_tab(right_top_box,xsize=tab_size,uvalue='tab_list')
   state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
   align_toggle_box = widget_base(right_top_box,/nonexclusive)
   state.align_toggle_button = widget_button(align_toggle_box,value='Align images',uvalue='align_toggle',tooltip='Align images using WCS coordinates')
@@ -3252,7 +3260,7 @@ pro phast_startup, phast_dir, launch_dir, small
   state.mode_droplist_id = widget_droplist(modebase, $
                                      uvalue = 'mode', $
                                      value = modelist)
-  widget_control,state.mode_droplist_id,set_droplist_select=3  
+  widget_control,state.mode_droplist_id,set_droplist_select=where(strlowcase(modelist) eq strlowcase(state.mousemode))
   
   button_base1 = widget_base(buttonbar_base, /column,/base_align_center)
   button_base2 = widget_base(buttonbar_base, /column,/base_align_center)
@@ -3378,14 +3386,16 @@ pro phast_startup, phast_dir, launch_dir, small
   ;MPC toolbox
   if state.tb_mpc_visible eq 1 then begin
      mpc_toggle = widget_button(left_pane,value='MPC Tools',uvalue='mpc_toggle')
-     state.mpc_box_id = widget_base(left_pane,/column,frame=4,xsize=250)
-     overlay_ephem = widget_button(state.mpc_box_id,value='Overlay Ephemeris',uvalue='overlay_ephem')
+     state.mpc_box_id = widget_base(left_pane,/column,frame=4,xsize=250,/base_align_center)
+     mpc_button_box_1 = widget_base(state.mpc_box_id,/row)
+     create_mpc_report = widget_button(mpc_button_box_1,value='Start MPC report',uvalue='create_mpc_report')
+     overlay_ephem = widget_button(mpc_button_box_1,value='Overlay Ephemeris',uvalue='overlay_ephem')
   endif
   
-  ; Set widget y size for small screens
-  state.draw_window_size[1] = state.draw_window_size[1] < $
-                              (state.screen_ysize - 300)
-  
+  ;; state.draw_window_size[1] = state.draw_window_size[1] < $
+  ;;                             (state.screen_ysize - 300)
+
+
   state.draw_widget_id = widget_draw(state.draw_base_id, $
                                      uvalue = 'draw_window', $
                                      /motion_events,  /button_events, $
@@ -3407,6 +3417,7 @@ pro phast_startup, phast_dir, launch_dir, small
   if state.tb_overlay_toggle eq 0 and state.tb_overlay_visible eq 1 then widget_control,state.overlay_stars_box_id,ysize=1
   if state.tb_blink_toggle eq 0 and state.tb_blink_visible eq 1 then widget_control,state.blink_base_id,ysize=1
   if state.tb_spice_toggle eq 0 and state.tb_spice_visible eq 1 then widget_control,state.spice_box_id,ysize=1
+  if state.tb_mpc_toggle eq 0 and state.tb_mpc_visible eq 1 then widget_control, state.mpc_box_id, ysize=1
   
   
   ; get the window ids for the draw widgets
@@ -3597,8 +3608,8 @@ pro phast_topmenu_event, event
         phast_remove_image,/all
      end
      'Clear output directory': begin
-        result = dialog_message('Empty ./output/images/ ?  This will remove all files from this directory',/question,/center)
-        if result eq 'Yes' then spawn, 'rm ./output/images/*'
+        result = dialog_message('Empty output/images/ ?  This will remove all files from this directory',/question,/center)
+        if result eq 'Yes' then spawn, 'rm '+state.phast_dir+'/output/images/*'
      end
      'Refresh current image': phast_refresh_image,state.current_image_index,state.imagename
      'Refresh all images': for i=0, state.num_images-1 do phast_refresh_image,i,image_archive[i]->get_name()

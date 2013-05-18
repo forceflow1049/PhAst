@@ -126,6 +126,9 @@ pro phast_batch
     end
     if state.over_toggle eq 1 then widget_control,over_correct,set_button=1
     if state.astrometry_toggle eq 1 then widget_control,astrometry_choice,set_button=1
+    if state.batch_image_toggle_state eq 0 then widget_control,state.batch_image_base, ysize=1
+    if state.batch_cal_toggle_state eq 0 then widget_control,state.batch_calibrate_base, ysize=1
+    if state.batch_astrometry_toggle_state eq 0 then widget_control,state.batch_astrometry_base, ysize=1
     
     phast_resetwindow
   endif
@@ -368,19 +371,30 @@ pro phast_batch_event,event
 end
 
 ;---------------------------------------------------------------------------
-pro phast_calculate_zeropoint, msgarr
+pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
 
   ; routine to calculate the photometric zero-point.  this routine saves the
   ; zeropoint values to fits header only when they are successfully determined.
+  ;set /external is this procedure is called with an image not loaded
 
   common phast_state
   common phast_filters
   common phast_images
-  
+  tic
   ; 1) determine filter and exposure for image
-  fits_read, state.imagename, image, head  ; patch: these should be placed somewhere else
+  fits_read, fitsfile, image, head  ; patch: these should be placed somewhere else
+
+  ;get image size
+  size = size(image)
+  image_width = size[1]
+  image_height = size[2]
+
+  ;get astrometry pointer
+  extast, head, astr, noparams
+  
   exposure  = sxpar(head,'EXPTIME')
   posFilter = sxpar(head,filters.fitsKey)
+  pixelscale = sxpar(head,'PIXELSCALE')/0.000277777777777778d
   fitColor  = filters.fitcolor[posFilter]
   fitTerm   = strmid(filters.fitTerm[posFilter],0,3) & if ~fitColor then magztrm = '   '
   imgBand   = strtrim(filters.nameFilter[posFilter])
@@ -402,8 +416,8 @@ pro phast_calculate_zeropoint, msgarr
     magzclr =  0.0
     mabztrm =  '   '
     magznum =  0
-    phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum
-    phast_refresh_image, state.current_image_index, state.imagename
+    phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum,imagename=fitsfile
+    if not keyword_set(external) then phast_refresh_image, state.current_image_index, state.imagename
     msgarr = strarr(2)
     msgarr(0) = 'Photometric zeropoint was input for filter ' + magzbnd
     msgarr(1) = 'as ' + string(magzero,'(F6.3)') + ' ' + string(177b) + ' ' + string(magzerr,'(F5.3)')
@@ -412,8 +426,8 @@ pro phast_calculate_zeropoint, msgarr
   
   ; zeropoint cannot be calculated for some filters
   if strlowcase(magBand) EQ 'x' then begin
-    phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum
-    phast_refresh_image, state.current_image_index, state.imagename
+    phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum,imagename=fitsfile
+    if not keyword_set(external) then phast_refresh_image, state.current_image_index, state.imagename
     msgarr = strarr(2)
     msgarr(0) = 'Photometric zeropoint cannot be determined for filter ' + imgBand
     msgarr(1) = 'No matching catalog magnitude.'
@@ -421,7 +435,7 @@ pro phast_calculate_zeropoint, msgarr
   endif
   
   ; must have astrometric solution to match to catalog
-  if ~ptr_valid(state.astr_ptr) then begin
+  if n_elements(astr) eq 0 then begin
     msgarr = strarr(2)
     msgarr(0) = 'Photometric zeropoint cannot be determined'
     msgarr(1) = 'Perform astrometric calibration first'
@@ -429,15 +443,15 @@ pro phast_calculate_zeropoint, msgarr
   endif
   
   ; begin zeropoint determination
-  widget_control,/hourglass ;this could be slow
+  widget_control,/hourglass     ;this could be slow
   
-  match_tol = 2.0 / 3600.   ; astrometric matching tolerance (arcsecs converted to degrees)
+  match_tol = (2.0 / 3600.)^2   ; astrometric matching tolerance (arcsecs converted to degrees) (squared for less compute time in comparing)
   sigmaClip = 3.0           ; outlier rejection (about 1-300 chance < |t|)
   minSNR    = 10.0          ; minimum detection SNR to use in calibration
   
   ; 2) obtain catalog for matching area on the sky
   expand = 1.25
-  phast_getFieldEpoch, a, d, radius, X, obsDate
+  phast_getFieldEpoch, a, d, radius, X, obsDate, astr=astr,header=head,image_width=image_width,image_height=image_height,pixelscale=pixelscale
   star_catalog = phast_get_stars(a,d,radius*expand,AsOf=obsDate,catalog_name=state.photcatalog_name)
   
   phast_getCatMags, star_catalog, magBand, cat_RA, cat_Dec, cat_Mag, err_Mag
@@ -486,9 +500,10 @@ pro phast_calculate_zeropoint, msgarr
     +       ' -PHOT_AUTOPARAMS ' + strcompress( string(state.sex_PHOT_AUTOPARAMS[0],'(F6.3)') + ','  $
     +                                           string(state.sex_PHOT_AUTOPARAMS[1],'(F6.3)'),       $
     /REMOVE_ALL )
-  phast_do_sextractor, image=state.imagename, flags=textstr, cat_name='./output/catalogs/zeropoint.cat'
+  print, 'here'
+  phast_do_sextractor, image=imagename, flags=textstr, cat_name=state.phast_dir+'/output/catalogs/zeropoint.cat'
   
-  readcol, state.phast_dir+'output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
+  readcol, state.phast_dir+'/output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
   
    ; qualify SExtractor detections
   Instr( where(   flags gt  0  ) ) = !values.F_NAN  ; avoid complicated/corrupted detections
@@ -499,7 +514,7 @@ pro phast_calculate_zeropoint, msgarr
   Instr( where( SNR lt minSNR) ) = !values.F_NAN  ; avoid low SNR detections
       
   ; scale to 1 sec (assumes that photon noise dominates read noise and other sources)
-     Instr = -2.5*alog10(signal /      exposure )
+  Instr = -2.5*alog10(signal /      exposure )
   errInstr = -2.5*alog10(sigma  / sqrt(exposure))   ; patch.  is this the right thing to do?
   
   good = where( finite(Instr) and finite(errInstr) )  ; reduce to surviving detections
@@ -517,29 +532,29 @@ pro phast_calculate_zeropoint, msgarr
   endelse
   
   ; 4) Match catalog objects to image
-          Cat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat magnitude of matching star
-       errCat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-     ColorFit = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index to fit color term
+  Cat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat magnitude of matching star
+  errCat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
+  ColorFit = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index to fit color term
   errColorFit = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-     ColorExt = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for extinction
+  ColorExt = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for extinction
   errColorExt = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-     ColorTrm = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for input color term
+  ColorTrm = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat color index for input color term
   errColorTrm = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan)
-    cosDec = cos(im_Dec*!PI/180.0)
-  
-  for i=0, n_elements(Instr)-1 do begin
-    match_dist = 1.0 ;(in deg)
-    close_dist = 1.0
-    match_index = -1 ; will be set to catalog index j when a match is found
-    for j=0, n_elements(cat_RA)-1 do begin
-      dist = sqrt( (cosDec[i]*(cat_RA[j]-im_RA[i]))^2 + (cat_Dec[j]-im_Dec[i])^2 )
-      ; match must be within match_tol with valid instrumental Mag and catalog magnitudes
-      close_dist = close_dist < dist
-      if (dist lt match_dist) and (dist lt match_tol) and finite(Instr[i]) and finite(cat_ColorFit[j]) then begin
-        match_dist  = dist
-        match_index = j
-      endif
-    endfor
+  cosDec = cos(im_Dec*!PI/180.0)
+
+  num_instr=n_elements(instr)-1
+  num_cat = n_elements(cat_RA)-1
+  for i=0, num_instr do begin
+     match_dist = 1.0       ;(in deg)
+     match_index = -1       ; will be set to catalog index j when a match is found
+     for j=0, num_cat do begin
+        dist = (cosDec[i]*(cat_RA[j]-im_RA[i]))^2 + (cat_Dec[j]-im_Dec[i])^2
+        ; match must be within match_tol with valid instrumental Mag and catalog magnitudes
+        if (dist lt match_tol) then if (dist lt match_dist) then if finite(Instr[i]) then if finite(cat_ColorFit[j]) then begin
+           match_dist  = dist
+           match_index = j
+        endif
+     endfor
     if match_index ne -1 then begin
               Cat[i] = cat_Mag[match_index]
            errCat[i] = err_Mag[match_index]
@@ -551,11 +566,11 @@ pro phast_calculate_zeropoint, msgarr
       errColorTrm[i] = err_ColorTrm[match_index]
     endif
   endfor
-  
-  ; adjust instrumental magnitude for extinction
+
+ ; adjust instrumental magnitude for extinction
   extMethod = 1 ; adjust for extinction color
   magType   = 2 ; (std) catalog magnitude
-  Instr = phast_ExtAdjust(extMethod, magType, Instr, ColorExt)
+  Instr = phast_ExtAdjust(extMethod, magType, Instr, ColorExt,header=head,astr=astr,image_width=image_width,image_height=image_height,pixelscale=pixelscale)
   
   ; transform from local to standard passband
   Instr = phast_StdAdjust(Instr, posFilter, ColorTrm)
@@ -582,7 +597,7 @@ pro phast_calculate_zeropoint, msgarr
     endif
   endelse
   
-  openw, 1, './output/photoZeroPointF.csv'  ; dataset at start of solution
+  openw, 1, state.phast_dir+'output/photoZeroPointF.csv'  ; dataset at start of solution
   for i=0, n_elements(Instr)-1 do begin
     printf, 1, Cat[i], errCat[i], ColorFit[i], errColorFit[i], Instr[i], errInstr[i], Y[i], errY[i], FORMAT='(8F8.3)'
   endfor
@@ -617,7 +632,6 @@ pro phast_calculate_zeropoint, msgarr
       msgarr(3) = 'Zeropoint determination was successful'
       
     endrep until (total(outliers) eq 0) or (ipass eq maxpass)
-    
   endif else begin
   
     ipass = 0
@@ -657,18 +671,19 @@ pro phast_calculate_zeropoint, msgarr
     endif else begin
       msgarr = strarr(2)
       msgarr(0) = 'Zeropoint determination failed'
-      msgarr(1) = 'Check ./output/photoZeroPoint.csv for data'
+      msgarr(1) = 'Check output/photoZeroPoint.csv for data'
     endelse
     
   endelse
   
-  openw, 1, './output/photoZeroPoint.csv'
+  openw, 1, state.phast_dir+'/output/photoZeroPoint.csv'
   for i=0, n_elements(Instr)-1 do begin
     printf, 1, Cat[i], errCat[i], ColorFit[i], errColorFit[i], Instr[i], errInstr[i], Y[i], errY[i], FORMAT='(8F8.3)'
   endfor
   close, 1
   
-  phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum
+  phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum,imagename=fitsfile
+  toc
 end
 
 ;----------------------------------------------------------------------
@@ -1120,6 +1135,8 @@ pro phast_do_batch
         phast_do_sextractor,image = state.cal_file_name,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
         phast_do_scamp,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
         phast_do_missfits, image = state.cal_file_name, flags = state.missfits_flags+' -SAVE_TYPE REPLACE'
+        ;compute zero-point
+        ;phast_calculate_zeropoint,state.cal_file_name,msgerr,external=external
      endif
      progress_bar->update,float(i)/num_files*100
   endfor
@@ -1169,6 +1186,7 @@ pro phast_do_sextractor,image = image, flags = flags, cat_name = cat_name
   
   if not keyword_set(image) then image = state.imagename
   if not keyword_set(flags) then flags = state.sex_flags
+  print, flags
   if not keyword_set(cat_name) then cat_name = state.sex_catalog_name
   
   cd, state.phast_dir
@@ -1444,7 +1462,7 @@ pro phast_zeropoint_event, event
       widget_control,state.zeropoint_image_widget_id,set_value=state.zeropoint_image_name
     end
     'start_zeropoint':begin
-    phast_calculate_zeropoint, msgarr
+    phast_calculate_zeropoint, state.imagename,msgarr
     result = dialog_message(msgarr,/center,/information)
   end
   'done':widget_control,event.top,/destroy

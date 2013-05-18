@@ -795,30 +795,27 @@ end
 
 ;----------------------------------------------------------------------
 
-function phast_ExtAdjust, ExtMethod, MagType, magVal, magColor,header=header,astr=astr,image_width=image_width,image_height=image_height,pixelscale=pixelscale
+function phast_ExtAdjust, ExtMethod, MagType, magVal, magColor
 
   ; adjust instrumental magnitude for extinction (k' k'')
 
   common phast_state
   common phast_filters
 
-  if not keyword_set(header) then header = *state.head_ptr
-  if not keyword_set(astr) then astr = *state.astr_ptr
-
-  posFilter = sxpar(header,filters.fitsKey)
+  posFilter = sxpar(*state.head_ptr,filters.fitsKey)
   case ExtMethod of
     0: ; do nothing
     1: begin ; adjust at airmass of observation
-       phast_getFieldEpoch, a, d,radius, X0, obsDate,header=header,astr=astr,image_width=image_width,image_height=image_height,pixelscale=pixelscale
-       if n_elements(astr) gt 0 then begin
+       phast_getFieldEpoch, a, d,radius, X0, obsDate
+       if ptr_valid(state.astr_ptr) then begin
           ; adjust magVal for differential airmass within frame (k' term)
        endif
        ; adjust for color effect (k'' term)
        magVal = magVal - filters.atmColorVI[posFilter] * 1.9480*magColor * X0
        end
     2: begin ; adjust to ex-atmosphere (X=0)
-       phast_getFieldEpoch, a, d,radius, X0, obsDate,header=header,astr=astr,image_width=image_width,image_height=image_height,pixelscale=pixelscale
-       if n_elements(astr) gt 0 then begin
+       phast_getFieldEpoch, a, d,radius, X0, obsDate
+       if ptr_valid(state.astr_ptr) then begin
           ; adjust magVal for differential airmass within frame
        endif
        ; only Instr magnitudes need adjustment to X = 0; the zeropoint does this for catalog magnitudes

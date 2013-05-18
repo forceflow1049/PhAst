@@ -252,6 +252,7 @@ phast_other: misc procedures
      phast_check_moons
      phast_gaussfit
      phast_getstats
+     phast_get_obs_time
      phast_help
      phast_help_event
      phast_loadregion

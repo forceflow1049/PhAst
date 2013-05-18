@@ -257,7 +257,7 @@ function phast_get_obs_time, header
      break
   endwhile
 
-  return, double(jd)
+  return, jd
 end
 
 ;---------------------------------------------------------------------
