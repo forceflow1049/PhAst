@@ -164,6 +164,8 @@ pro phast_initcommon, phast_dir, launch_dir, small
     }
     
   state = {                $
+    batch_mef_toggle: 0, $ ;treat mef images as mosaics?
+    batch_mef_toggle_id:0L,$;widget ID for batch mef toggle
     tb_mpc_toggle: 0, $    ;is the MPC toolbox opened?
     mpc_box_id: 0L, $      ;Widget ID for MPC toolbox
     tb_mpc_visible: 0, $   ;is the MPC toolbox drawn?
