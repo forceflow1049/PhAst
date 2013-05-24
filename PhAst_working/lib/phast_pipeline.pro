@@ -386,7 +386,7 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
   common phast_state
   common phast_filters
   common phast_images
-  tic
+  
   ; 1) determine filter and exposure for image
   fits_read, fitsfile, image, head  ; patch: these should be placed somewhere else
 
@@ -688,7 +688,6 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
   close, 1
   
   phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum,imagename=fitsfile
-  toc
 end
 
 ;----------------------------------------------------------------------
@@ -706,15 +705,15 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
   
   if keyword_set(mosaic) then begin
      fits_info,input_file,n_ext=num_ext,/silent
-     spawn, 'cp '+input_file+' '+output_file
+     ;spawn, 'cp '+input_file+' '+output_file
   endif else begin
      num_ext = 1
   end
 
-  for i=1, num_ext do begin
+  for cal_index=1, num_ext do begin
 
      if keyword_set(mosaic) then begin
-        fits_read,output_file,cal_science,cal_science_head,exten_no=i
+        fits_read,input_file,cal_science,cal_science_head,exten_no=cal_index
      endif else fits_read,input_file,cal_science,cal_science_head
 
      ;copy images so that originals are not modified
@@ -724,43 +723,97 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
      dark = float(cal_dark)
   
      ;correct overscan
-     error = 0
-     ;catch,error
-     if error ne 0 then result = dialog_message('Error encountered.  No overscan region present?',/error,/center)
-     if state.over_toggle ne 0 and error eq 0 then begin
-  
-    ;determine overscan region
-        overscan = sxpar(cal_science_head,'BIASSEC')
-        split = strsplit(overscan,'[,:]',/extract)
-        region = fix(split)-1
-        region[0] = region[0]-1
+     if state.over_toggle ne 0 then begin
+        
+        ;size of current file
+        row_length = n_elements(main[*,0])
+        column_length = n_elements(main[0,*])
 
-    ;remove overscan from each image
-        for i=0,region[3] do begin ;cycle columns
-           med_main = median(main[region[0]+1:region[1],i])
-           main[*,i] = main[*,i]-med_main
-           if state.dark_toggle ne 0 then begin
-              med_dark = median(dark[region[0]+1:region[1],i])
-              dark[*,i] = dark[*,i]-med_dark 
+        ;find main image region.  rest is overscan
+        while (1 eq 1) do begin ;choose only one option
+           value = sxpar(cal_science_head,'DATASEC',count=count)
+           if count ne 0 then begin
+              split = strsplit(value,'[,:]',/extract)
+              image_region = fix(split)-1 ;convert to 0-index
+              if ( row_length -1 - image_region[1] + image_region[0]) ne 0 then begin ;bias region is on left/right of image
+                 type = 0 ;bias region is column
+                 if image_region[0] eq 0 then begin
+                    x_min = image_region[1]+1
+                    x_max = row_length - 1
+                 endif else begin
+                    x_min = 0
+                    x_max = image_region[0]-1    
+                 endelse
+                 region = [x_min,x_max,0,column_length-1]
+                 break
+              endif else if (column_length - 1 - image_region[3] + image_region[2]) ne 0 then begin ;bias region is on top/bottom of image
+                 type = 1 ;bias region is row
+                  if image_region[2] eq 0 then begin
+                    y_min = image_region[3]+1
+                    y_max = column_length -1
+                 endif else begin
+                    y_min = 0
+                    y_max = image_region[2] - 1
+                 endelse
+                 region = [0,row_length-1,y_min,y_max]
+                 break
+              endif else begin ;no bias region
+                 result = dialog_message('Error encountered.  No overscan region present?',/error,/center)
+                 return
+              endelse
            endif
-           if state.flat_toggle ne 0 then begin
-              med_flat = median(flat[region[0]+1:region[1],i])
-              flat[*,i] = flat[*,i]-med_flat
-           endif
-           if state.bias_toggle ne 0 then begin
-              med_bias = median(bias[region[0]+1:region[1],i])
-              bias[*,i] = bias[*,i]-med_bias
-           endif
-        endfor
-    ;  print,bias[50:60,50:60]
+           result = dialog_message('Error encountered.  No overscan region present?',/error,/center)
+           return
+        endwhile
+        
+        ;remove overscan from each image
+
+        if type eq 0 then begin            ;bias region is made up of columns
+           for i=0, column_length-1 do begin ;cycle the rows
+              med_main = median(main[region[0]:region[1],i])
+              main[*,i] -= med_main
+              if state.dark_toggle ne 0 then begin
+                 med_dark = median(dark[region[0]:region[1],i])
+                 dark[*,i] -= med_dark
+              endif
+              if state.flat_toggle ne 0 then begin
+                 med_flat = median(flat[region[0]:region[1],i])
+                 flat[*,i] -= med_flat
+              endif
+              if state.bias_toggle ne 0 then begin
+                 med_bias = median(bias[region[0]:region[1],i])
+                 bias[*,i] -= med_bias
+              endif
+           endfor
+        endif else begin                ;bias region is made up of rows
+           for i=0, row_length-1 do begin ;cycle the columns
+              med_main = median(main[i,region[2]:region[3]])
+              main[i,*] -= med_main
+              if state.dark_toggle ne 0 then begin
+                 med_dark = median(dark[i,region[2]:region[3]])
+                 dark[i,*] -= med_dark
+              endif
+              if state.flat_toggle ne 0 then begin
+                 med_flat = median(flat[i,region[2]:region[3]])
+                 flat[i,*] -= med_flat
+              endif
+              if state.bias_toggle ne 0 then begin
+                 med_bias = median(bias[i,region[2]:region[3]])
+                 bias[i,*] -= med_bias
+              endif
+           endfor
+        endelse
+
     ;trim overscan region from each image
   
-        main = main(0 : region[0],region[2] : region[3])
-        if state.dark_toggle ne 0 then dark = dark(0 : region[0],region[2] : region[3])
-        if state.flat_toggle ne 0 then flat = flat(0 : region[0],region[2] : region[3])
-        if state.bias_toggle ne 0 then bias = bias(0 : region[0],region[2] : region[3])
-  ; fits_write, 'bias-overscan.fits',bias,cal_bias_head
-    
+        main = main[image_region[0]:image_region[1],image_region[2]:image_region[3]]
+        if state.dark_toggle ne 0 then dark = dark[image_region[0]:image_region[1],image_region[2]:image_region[3]]
+        if state.flat_toggle ne 0 then flat = flat[image_region[0]:image_region[1],image_region[2]:image_region[3]]
+        if state.bias_toggle ne 0 then bias = bias[image_region[0]:image_region[1],image_region[2]:image_region[3]]
+
+        ;remove superfluous header entries
+        sxdelpar, cal_science_head, 'BIASSEC'
+        sxdelpar, cal_science_head, 'TRIMSEC'    
      endif
   ;subtract bias
      if state.bias_toggle ne 0 then begin
@@ -840,6 +893,7 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
         sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
         sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'        
         sxdelpar,cal_science_head, 'WAT0_001'
+        sxaddpar,cal_science_head, 'WAT1_001'
         sxdelpar,cal_science_head, 'WAT1_002'
         sxdelpar,cal_science_head, 'WAT1_003'
         sxdelpar,cal_science_head, 'WAT1_004'
@@ -849,13 +903,18 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
         sxdelpar,cal_science_head, 'WAT2_003'
         sxdelpar,cal_science_head, 'WAT2_004'
         sxdelpar,cal_science_head, 'WAT2_005'
-        ;sxaddpar,cal_science_head,'BITPIX','-32'
+        sxdelpar,cal_science_head, 'CHECKSUM'
+        sxdelpar,cal_science_head, 'DATASUM'
+        if state.over_toggle eq 1 then begin ;update NAXIS keywords
+           sxaddpar,cal_science_head, 'NAXIS1',n_elements(main[*,0])
+           sxaddpar,cal_science_head, 'NAXIS2',n_elements(main[0,*])
+        endif
      endelse
      sxdelpar,cal_science_head,'' ;trim whitespace entries
      sxaddpar,cal_science_header, 'END',''
      if not keyword_set(mosaic) then begin
         fits_write,output_file,main,cal_science_head
-     endif else modfits, output_file,long(main),cal_science_head,exten_no=i
+     endif else writefits, output_file,long(main),cal_science_head,/append
   endfor
 end
 
@@ -1145,7 +1204,7 @@ pro phast_do_batch
   common phast_images
   
   widget_control,/hourglass
-  
+  tic
   case state.batch_source of
     0: begin
       num_files = state.num_images
@@ -1187,6 +1246,7 @@ pro phast_do_batch
      progress_bar->update,float(i+1)/num_files*100
   endfor
   progress_bar->destroy
+  toc
 end
 
 ;----------------------------------------------------------------------
