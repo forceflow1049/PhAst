@@ -204,6 +204,12 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   if not keyword_set(refresh_toggle) then begin ;normal image adding
      new_image_size = size(new_image)
      if state.num_images gt 0 then begin ;check not first image
+                                ;save current stretch settings
+        image_archive[state.current_image_index]->set_min_stretch, state.min_value
+        image_archive[state.current_image_index]->set_max_stretch, state.max_value
+        image_archive[state.current_image_index]->set_brightness, state.brightness
+        image_archive[state.current_image_index]->set_contrast, state.contrast
+        image_archive[state.current_image_index]->set_asinh_beta, state.asinh_beta
         state.num_images++
         if state.num_images gt state.archive_size then phast_expand_archive
         image_archive[state.num_images-1] = obj_new('phast_image') ;create new image object
@@ -341,9 +347,12 @@ pro phast_cycle_images, direction,animate=animate
   common phast_state
   common phast_images
 
-  ;save current stretch settings
-  ;; image_archive[state.current_image_index]->set_contrast, state.contrast
-  ;; image_archive[state.current_image_index]->set_brightness, state.brightness
+     ;save current stretch settings
+  image_archive[state.current_image_index]->set_min_stretch, state.min_value
+  image_archive[state.current_image_index]->set_max_stretch, state.max_value
+  image_archive[state.current_image_index]->set_brightness, state.brightness
+  image_archive[state.current_image_index]->set_contrast, state.contrast
+  image_archive[state.current_image_index]->set_asinh_beta, state.asinh_beta
  
   if state.num_images gt 1 then begin
      if not keyword_set(animate) then begin
@@ -404,9 +413,14 @@ pro phast_cycle_images, direction,animate=animate
      main_image = image_archive[state.current_image_index]->get_image()
      state.imagename  = image_archive[state.current_image_index]->get_name()
      phast_setheader, image_archive[state.current_image_index]->get_header(/string)
-     ;get new stretch settings
-     ;; state.brightness = image_archive[state.current_image_index]->get_brightness()
-     ;; state.contrast = image_archive[state.current_image_index]->get_contrast()  
+       ;get new stretch settings
+     state.contrast = image_archive[state.current_image_index]->get_contrast()
+     state.brightness = image_archive[state.current_image_index]->get_brightness()
+     state.min_value = image_archive[state.current_image_index]->get_min_stretch()
+     state.max_value = image_archive[state.current_image_index]->get_max_stretch()
+     state.asinh_beta = image_archive[state.current_image_index]->get_asinh_beta()
+     phast_stretchct
+     phast_set_minmax
      counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
      temp = strsplit(image_archive[state.current_image_index]->get_name(),'/\',count=count,/extract)
      state.sex_catalog_path = ""
@@ -1454,18 +1468,26 @@ pro phast_image_switch, index
   common phast_state
   common phast_images
   if state.num_images gt 0 then begin
+
      ;save current stretch settings
-     ;; image_archive[state.current_image_index]->set_min_stretch, state.min_value
-     ;; image_archive[state.current_image_index]->set_max_stretch, state.max_value
+     image_archive[state.current_image_index]->set_min_stretch, state.min_value
+     image_archive[state.current_image_index]->set_max_stretch, state.max_value
+     image_archive[state.current_image_index]->set_brightness, state.brightness
+     image_archive[state.current_image_index]->set_contrast, state.contrast
+     image_archive[state.current_image_index]->set_asinh_beta, state.asinh_beta
+     ;switch images
      state.current_image_index = index
      main_image = image_archive[state.current_image_index]->get_image()
      state.imagename  = image_archive[state.current_image_index]->get_name()
      phast_setheader, image_archive[state.current_image_index]->get_header(/string)
      ;get new stretch settings
-     ;; state.min_value = image_archive[state.current_image_index]->get_min_stretch()
-     ;; state.max_value = image_archive[state.current_image_index]->get_max_stretch()
-     ;; phast_set_minmax
-
+     state.contrast = image_archive[state.current_image_index]->get_contrast()
+     state.brightness = image_archive[state.current_image_index]->get_brightness()
+     state.min_value = image_archive[state.current_image_index]->get_min_stretch()
+     state.max_value = image_archive[state.current_image_index]->get_max_stretch()
+     state.asinh_beta = image_archive[state.current_image_index]->get_asinh_beta()
+     phast_stretchct
+     phast_set_minmax
      ;; counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
      ;; ;update widgets
      ;; widget_control,state.image_counter_id,set_value= counter_string
@@ -1495,7 +1517,10 @@ pro phast_image__define
             astr:ptr_new(),$    ;holds astrometry data, if available
             rotation:ptr_new(),$;holds rotation state of image in deg
             min_stretch:ptr_new(),$;holds the stretch min for the image
-            max_stretch:ptr_new()$ ;holds the stretch max for the iamge
+            max_stretch:ptr_new(),$;holds the stretch max for the iamge
+            asinh_beta: ptr_new(),$;holds beta value for asinh stretch
+            brightness: ptr_new(),$;holds the brightness of the stretch
+            contrast: ptr_new()$;holds the contrast of the stretch
            }
 end
 
@@ -1540,6 +1565,18 @@ pro phast_image::Cleanup
   ptr_free,self.astr
   ptr_free, self.min_stretch
   ptr_free, self.max_stretch
+  ptr_free, self.asinh_beta
+  ptr_free, self.brightness
+  ptr_free, self.contrast
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_asinh_beta
+  
+;routine to return beta parameter for asinh stretch
+  
+  return,*(self.asinh_beta)
 end
 
 ;----------------------------------------------------------------------
@@ -1549,6 +1586,15 @@ function phast_image::get_astr
 ;routine to return astrometry data for the image
   
   return,*(self.astr)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_brightness
+  
+;routine to return the brightness of the image stretch
+  
+  return,*(self.brightness)
 end
 
 ;----------------------------------------------------------------------
@@ -1567,6 +1613,15 @@ function phast_image::get_catalog_type
 ;routine to return a catalog type
 
   return, *(self.catalog_type)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_contrast
+  
+;routine to return the contrast of the image stretch
+  
+  return,*(self.contrast)
 end
 
 ;----------------------------------------------------------------------
@@ -1673,8 +1728,20 @@ function phast_image::init
   self.rotation = ptr_new(/allocate)
   self.max_stretch = ptr_new(/allocate)
   self.min_stretch = ptr_new(/allocate)
+  self.brightness = ptr_new(0.5)
+  self.contrast = ptr_new(0.5)
+  self.asinh_beta = ptr_new(0.1)
   self.astr = ptr_new()  ;this will be allocated when astrometry data is present
   return,1
+end
+
+;----------------------------------------------------------------------
+
+pro phast_image::set_asinh_beta, b
+  
+;routine to set the beta parameter for asinh stretch
+  
+  *(self.asinh_beta) = b
 end
 
 ;----------------------------------------------------------------------
@@ -1688,6 +1755,15 @@ end
 
 ;----------------------------------------------------------------------
 
+pro phast_image::set_brightness, b
+  
+;routine to set the brightness of the image stretch
+  
+ *(self.brightness) = b
+end
+
+;----------------------------------------------------------------------
+
 pro phast_image::set_catalog,new_catalog, type
   
 ;routine to set the astrometry info for the image
@@ -1696,6 +1772,15 @@ pro phast_image::set_catalog,new_catalog, type
   ptr_free, self.catalog_type
   self.catalog = ptr_new(new_catalog)
   self.catalog_type = ptr_new(type)
+end
+
+;----------------------------------------------------------------------
+
+pro phast_image::set_contrast, c
+  
+;routine to set the contrast of the image stretch
+  
+ *(self.contrast) = c
 end
 
 ;----------------------------------------------------------------------
@@ -2616,6 +2701,8 @@ pro phast_read_vicar,  newimage=newimage, dir=dir
         for i=1, n_elements(vicarfile)-1 do begin
            image = read_vicar(vicarfile[i],label) ;read the image
            phast_add_image,image,vicarfile[i],'',newimage=newimage, /dir_add
+           if (state.default_stretch EQ 0 AND $
+               state.default_autoscale EQ 1) then phast_autoscale
         endfor
      endif else begin
         newimage = 0
@@ -3538,8 +3625,6 @@ pro phast_topmenu_event, event
               state.zoom_level =  0
               state.zoom_factor = 1.0
            endif
-           if (state.default_stretch EQ 0 AND $
-               state.default_autoscale EQ 1) then phast_autoscale
            if (state.firstimage EQ 1) then phast_autoscale
            
            phast_set_minmax

@@ -1,5 +1,6 @@
 New features:
 -New tabbed interface for easier image switching [Morgan Rehnberg]
 -Small mode for screens with minimal resolution [Morgan Rehnberg]
+-Separate stretch values for each image [Morgan Rehnberg]
 Bugs fixed:
 

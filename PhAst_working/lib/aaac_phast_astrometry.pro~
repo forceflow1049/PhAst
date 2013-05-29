@@ -60,12 +60,12 @@ pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul, astr=astr, head
         return
      endif else begin 
         datejul = image_archive[state.current_image_index]->get_obs_date()
-        date_vec = date_conv(datejzul,'V')
+        date_vec = date_conv(datejul,'V')
         YYYY = date_vec[0]
      endelse
   endif else begin 
-     datejul = phast_get_obs_time(head)   
-     date_vec = date_conv(datejzul,'V')
+     datejul = phast_get_obs_time(head)
+     date_vec = date_conv(datejul,'V')
      YYYY = date_vec[0]
   endelse
   exptime = float(sxpar(head,'EXPTIME'))

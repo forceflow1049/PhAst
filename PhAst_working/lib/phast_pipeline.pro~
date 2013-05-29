@@ -18,7 +18,7 @@ pro phast_batch
       uvalue = 'batch_base')
       
     state.batch_image_toggle = widget_button(batch_base,value='Select images',uvalue='batch_image_toggle')
-    state.batch_image_base  = widget_base(batch_base,frame=4,/column,xsize=600,ysize=160)
+    state.batch_image_base  = widget_base(batch_base,frame=4,/column,xsize=600,ysize=190)
     state.batch_cal_toggle = widget_button(batch_base,value='Calibration settings',uvalue='batch_cal_toggle')
     state.batch_calibrate_base = widget_base(batch_base,frame=4,/column,xsize=600,ysize=170)
     state.batch_astrometry_toggle = widget_button(batch_base,value='Astrometry settings',uvalue='batch_astrometry_toggle')
@@ -55,6 +55,9 @@ pro phast_batch
     extname_base = widget_base(state.batch_single_image_base,/row)
     state.batch_select_image = widget_button(extname_base,value='Select image',uvalue='select_image',sensitive=0)
     state.batch_image_id = widget_label(extname_base,value=' No image selected',/dynamic_resize, sensitive=0)
+
+    mef_toggle_box = widget_base(state.batch_image_base,/row,/nonexclusive)
+    state.batch_mef_toggle_id = widget_button(mef_toggle_box,value='Treat multi-extension FITS files as mosaics', uvalue='mef_toggle')
 
     
     ;calibrate base
@@ -129,6 +132,7 @@ pro phast_batch
     if state.batch_image_toggle_state eq 0 then widget_control,state.batch_image_base, ysize=1
     if state.batch_cal_toggle_state eq 0 then widget_control,state.batch_calibrate_base, ysize=1
     if state.batch_astrometry_toggle_state eq 0 then widget_control,state.batch_astrometry_base, ysize=1
+    if state.batch_mef_toggle eq 1 then widget_control,state.batch_mef_toggle_id,set_button=1
     
     phast_resetwindow
   endif
@@ -156,7 +160,7 @@ pro phast_batch_event,event
               break
            endif
            if state.batch_image_toggle_state eq 0 then begin
-              widget_control, state.batch_image_base,ysize=160
+              widget_control, state.batch_image_base,ysize=190
               state.batch_image_toggle_state = 1
               break
            endif
@@ -175,6 +179,8 @@ pro phast_batch_event,event
         state.batch_source = 2
         
      end
+     'mef_toggle': state.batch_mef_toggle = event.select
+
      ;calibrate base
      'batch_cal_toggle': begin
         while (1 eq 1) do begin ;choose one
@@ -380,7 +386,7 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
   common phast_state
   common phast_filters
   common phast_images
-  tic
+  
   ; 1) determine filter and exposure for image
   fits_read, fitsfile, image, head  ; patch: these should be placed somewhere else
 
@@ -500,8 +506,7 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
     +       ' -PHOT_AUTOPARAMS ' + strcompress( string(state.sex_PHOT_AUTOPARAMS[0],'(F6.3)') + ','  $
     +                                           string(state.sex_PHOT_AUTOPARAMS[1],'(F6.3)'),       $
     /REMOVE_ALL )
-  print, 'here'
-  phast_do_sextractor, image=imagename, flags=textstr, cat_name=state.phast_dir+'/output/catalogs/zeropoint.cat'
+  phast_do_sextractor, image=fitsfile, flags=textstr, cat_name=state.phast_dir+'/output/catalogs/zeropoint.cat'
   
   readcol, state.phast_dir+'/output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
   
@@ -683,142 +688,174 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
   close, 1
   
   phast_phot_updateFits, image, head, magzero, magzerr, magzbnd, magzclr, magztrm, magznum,imagename=fitsfile
-  toc
 end
 
 ;----------------------------------------------------------------------
 
-pro phast_calibrate
+pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
 
   ;routine to calibrate an image based on any or all of dark/flat/bias
   ;and trim any image overscan
 
   common phast_state
   common phast_images
+
+  if not keyword_set(input_file) then input_file = state.cal_file_name
+  if not keyword_set(output_file) then output_file = state.cal_file_name
   
-  ;copy images so that originals are not modified
-  main = float(cal_science)
-  bias = float(cal_bias)
-  flat = float(cal_flat)
-  dark = float(cal_dark)
-  ;print,bias[50:60,50:60]
+  if keyword_set(mosaic) then begin
+     fits_info,input_file,n_ext=num_ext,/silent
+     spawn, 'cp '+input_file+' '+output_file
+  endif else begin
+     num_ext = 1
+  end
+
+  for i=1, num_ext do begin
+
+     if keyword_set(mosaic) then begin
+        fits_read,output_file,cal_science,cal_science_head,exten_no=i
+     endif else fits_read,input_file,cal_science,cal_science_head
+
+     ;copy images so that originals are not modified
+     main = float(cal_science)
+     bias = float(cal_bias)
+     flat = float(cal_flat)
+     dark = float(cal_dark)
   
-  ;correct overscan
-  error = 0
-  ;catch,error
-  if error ne 0 then result = dialog_message('Error encountered.  No overscan region present?',/error,/center)
-  if state.over_toggle ne 0 and error eq 0 then begin
+     ;correct overscan
+     error = 0
+     ;catch,error
+     if error ne 0 then result = dialog_message('Error encountered.  No overscan region present?',/error,/center)
+     if state.over_toggle ne 0 and error eq 0 then begin
   
     ;determine overscan region
-    overscan = sxpar(cal_science_head,'BIASSEC')
-    split = strsplit(overscan,'[,:]',/extract)
-    region = fix(split)-1
-    region[0] = region[0]-1
+        overscan = sxpar(cal_science_head,'BIASSEC')
+        split = strsplit(overscan,'[,:]',/extract)
+        region = fix(split)-1
+        region[0] = region[0]-1
 
     ;remove overscan from each image
-    for i=0,region[3] do begin ;cycle columns
-      med_main = median(main[region[0]+1:region[1],i])
-      main[*,i] = main[*,i]-med_main
-      if state.dark_toggle ne 0 then begin
-        med_dark = median(dark[region[0]+1:region[1],i])
-        dark[*,i] = dark[*,i]-med_dark 
-      endif
-      if state.flat_toggle ne 0 then begin
-        med_flat = median(flat[region[0]+1:region[1],i])
-        flat[*,i] = flat[*,i]-med_flat
-      endif
-      if state.bias_toggle ne 0 then begin
-        med_bias = median(bias[region[0]+1:region[1],i])
-        bias[*,i] = bias[*,i]-med_bias
-      endif
-    endfor
+        for i=0,region[3] do begin ;cycle columns
+           med_main = median(main[region[0]+1:region[1],i])
+           main[*,i] = main[*,i]-med_main
+           if state.dark_toggle ne 0 then begin
+              med_dark = median(dark[region[0]+1:region[1],i])
+              dark[*,i] = dark[*,i]-med_dark 
+           endif
+           if state.flat_toggle ne 0 then begin
+              med_flat = median(flat[region[0]+1:region[1],i])
+              flat[*,i] = flat[*,i]-med_flat
+           endif
+           if state.bias_toggle ne 0 then begin
+              med_bias = median(bias[region[0]+1:region[1],i])
+              bias[*,i] = bias[*,i]-med_bias
+           endif
+        endfor
     ;  print,bias[50:60,50:60]
     ;trim overscan region from each image
   
-    main = main(0 : region[0],region[2] : region[3])
-    if state.dark_toggle ne 0 then dark = dark(0 : region[0],region[2] : region[3])
-    if state.flat_toggle ne 0 then flat = flat(0 : region[0],region[2] : region[3])
-    if state.bias_toggle ne 0 then bias = bias(0 : region[0],region[2] : region[3])
+        main = main(0 : region[0],region[2] : region[3])
+        if state.dark_toggle ne 0 then dark = dark(0 : region[0],region[2] : region[3])
+        if state.flat_toggle ne 0 then flat = flat(0 : region[0],region[2] : region[3])
+        if state.bias_toggle ne 0 then bias = bias(0 : region[0],region[2] : region[3])
   ; fits_write, 'bias-overscan.fits',bias,cal_bias_head
     
-  endif
+     endif
   ;subtract bias
-  if state.bias_toggle ne 0 then begin
-     main = (main-bias)>0
-  endif
+     if state.bias_toggle ne 0 then begin
+        main = (main-bias)>0
+     endif
   
   ;subtract dark
-  if state.dark_toggle ne 0 then begin
+     if state.dark_toggle ne 0 then begin
     ;subtract bias
-    dark = dark-bias
+        dark = dark-bias
     ;normalize dark to science image exposure length
-    dark_exp = sxpar(cal_dark_head,'EXPTIME')
-    sci_exp = sxpar(cal_science_head,'EXPTIME')
-    scale_factor = sci_exp/dark_exp
-    dark = scale_factor*dark
+        dark_exp = sxpar(cal_dark_head,'EXPTIME')
+        sci_exp = sxpar(cal_science_head,'EXPTIME')
+        scale_factor = sci_exp/dark_exp
+        dark = scale_factor*dark
     ;subtract dark from science image
-    main = main-dark
-  endif
+        main = main-dark
+     endif
   
   ;divide by flat
-  if state.flat_toggle ne 0 then begin
+     if state.flat_toggle ne 0 then begin
     ;subtract bias from flat
-    flat = (flat - bias)>1
+        flat = (flat - bias)>1
     ;scale dark to match flat exposure time
-    if state.dark_toggle ne 0 then begin
-      dark = cal_dark
-      flat_exp = sxpar(cal_flat_head,'EXPTIME')
-      scale_factor = flat_exp/dark_exp
-      dark = scale_factor*dark
-      flat = flat - dark
-    endif
+        if state.dark_toggle ne 0 then begin
+           dark = cal_dark
+           flat_exp = sxpar(cal_flat_head,'EXPTIME')
+           scale_factor = flat_exp/dark_exp
+           dark = scale_factor*dark
+           flat = flat - dark
+        endif
     
     ;find median value in middle 50% of image
-    size = size(flat)
-    h_seg = .25*size[1]
-    v_seg = .25*size[2]
-    med=median(flat[h_seg : 3*h_seg,v_seg : 3*v_seg])
+        size = size(flat)
+        h_seg = .25*size[1]
+        v_seg = .25*size[2]
+        med=median(flat[h_seg : 3*h_seg,v_seg : 3*v_seg])
     
     ;create flat map
-    map = flat/med
+        map = flat/med
     ;divide by map
-    main = main/map
- endif
+        main = main/map
+     endif
   ;bin resulting image
-  if state.x_bin ne 1 or state.y_bin ne 1 then begin
-     size = size(main)
-     main = frebin(main,float(size[1])/state.x_bin, float(size[2])/state.y_bin,/total)
-  endif
+     if state.x_bin ne 1 or state.y_bin ne 1 then begin
+        size = size(main)
+        main = frebin(main,float(size[1])/state.x_bin, float(size[2])/state.y_bin,/total)
+     endif
 
-  size = size(main) ;get image size
-  ra = sxpar(cal_science_head,'RA') ;get approx ra
-  dec = sxpar(cal_science_head,'DEC') ;get approx dec
+     size = size(main)                ;get image size
+     ra = sxpar(cal_science_head,'RA') ;get approx ra
+     dec = sxpar(cal_science_head,'DEC') ;get approx dec
   ;convert to degrees
-  ra = 15*ten(ra)
-  dec = ten(dec)
+     ra = 15*ten(ra)
+     dec = ten(dec)
   ;get current EQUINOX
-  equinox = sxpar(cal_science_head,'EQUINOX')
+     equinox = sxpar(cal_science_head,'EQUINOX')
   ;if wcsKPNO21m NE 1 then precess,ra,dec,equinox,2000 ; precess to J2000
   
   ;write header values required for plate solution
-  sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
-  sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'
-  sxaddpar,cal_science_head,'CUNIT1','deg'
-  sxaddpar,cal_science_head,'CUNIT2','deg'
-  sxaddpar,cal_science_head,'CRPIX1',size[1]/2,format='E11.5'
-  sxaddpar,cal_science_head,'CRPIX2',size[2]/2,format='E11.5'
-  sxaddpar,cal_science_head,'CRVAL1',ra,format='E12.5'
-  sxaddpar,cal_science_head,'CRVAl2',dec,format='E12.5'
-  sxaddpar,cal_science_head,'CDELT1',state.fits_cdelt1,format='E14.7'
-  sxaddpar,cal_science_head,'CDELT2',state.fits_cdelt2,format='E14.7'
-  sxaddpar,cal_science_head,'CROTA1',state.fits_crota1,format='E11.5'
-  sxaddpar,cal_science_head,'CROTA2',state.fits_crota2,format='E11.5'
-  sxaddpar,cal_science_head,'EQUINOX',2000.0
-  sxaddpar,cal_science_head,'EPOCH',2000.0
-  sxdelpar,cal_science_head,'' ;trim whitespace entries
-  sxaddpar,cal_science_header, 'END',''
-
-  fits_write,state.cal_file_name,main,cal_science_head
+     if not keyword_set(mosaic) then begin
+        sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
+        sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'
+        sxaddpar,cal_science_head,'CUNIT1','deg'
+        sxaddpar,cal_science_head,'CUNIT2','deg'
+        sxaddpar,cal_science_head,'CRPIX1',size[1]/2,format='E11.5'
+        sxaddpar,cal_science_head,'CRPIX2',size[2]/2,format='E11.5'
+        sxaddpar,cal_science_head,'CRVAL1',ra,format='E12.5'
+        sxaddpar,cal_science_head,'CRVAl2',dec,format='E12.5'
+        sxaddpar,cal_science_head,'CDELT1',state.fits_cdelt1,format='E14.7'
+        sxaddpar,cal_science_head,'CDELT2',state.fits_cdelt2,format='E14.7'
+        sxaddpar,cal_science_head,'CROTA1',state.fits_crota1,format='E11.5'
+        sxaddpar,cal_science_head,'CROTA2',state.fits_crota2,format='E11.5'
+        sxaddpar,cal_science_head,'EQUINOX',2000.0
+        sxaddpar,cal_science_head,'EPOCH',2000.0
+     endif else begin
+        sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
+        sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'        
+        sxdelpar,cal_science_head, 'WAT0_001'
+        sxdelpar,cal_science_head, 'WAT1_002'
+        sxdelpar,cal_science_head, 'WAT1_003'
+        sxdelpar,cal_science_head, 'WAT1_004'
+        sxdelpar,cal_science_head, 'WAT1_005'
+        sxdelpar,cal_science_head, 'WAT2_001'
+        sxdelpar,cal_science_head, 'WAT2_002'
+        sxdelpar,cal_science_head, 'WAT2_003'
+        sxdelpar,cal_science_head, 'WAT2_004'
+        sxdelpar,cal_science_head, 'WAT2_005'
+        ;sxaddpar,cal_science_head,'BITPIX','-32'
+     endelse
+     sxdelpar,cal_science_head,'' ;trim whitespace entries
+     sxaddpar,cal_science_header, 'END',''
+     if not keyword_set(mosaic) then begin
+        fits_write,output_file,main,cal_science_head
+     endif else modfits, output_file,long(main),cal_science_head,exten_no=i
+  endfor
 end
 
 ;---------------------------------------------------------------------
@@ -1107,7 +1144,7 @@ pro phast_do_batch
   common phast_images
   
   widget_control,/hourglass
-  
+  tic
   case state.batch_source of
     0: begin
       num_files = state.num_images
@@ -1127,20 +1164,29 @@ pro phast_do_batch
   
   progress_bar = obj_new('cgprogressbar',title='Processing images',/start)
   for i=0,num_files-1 do begin
-     fits_read,filelist[i],cal_science,cal_science_head
+     mosaic = 0
+     fits_info, filelist[i],n_ext=ext_count,/silent
+     if ext_count gt 0 and state.batch_mef_toggle eq 1 then mosaic = 1
+    ; fits_read,filelist[i],cal_science,cal_science_head
      split = strsplit(filelist[i],'/\.',count=count,/extract)
      state.cal_file_name = state.phast_dir+'/output/images/'+split[count-2]+'.'+split[count-1]
-     phast_calibrate
+     phast_calibrate, input_file=filelist[i],output_file=state.cal_file_name,mosaic=mosaic
+     
+     progress_bar->update,float(i+1)/num_files*100*(.25)
      if state.astrometry_toggle ne 0 then begin
         phast_do_sextractor,image = state.cal_file_name,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
+        progress_bar->update,float(i+1)/num_files*100*(.50)
         phast_do_scamp,cat_name=state.phast_dir+'/output/images/'+split[count-2]+'.cat'
         phast_do_missfits, image = state.cal_file_name, flags = state.missfits_flags+' -SAVE_TYPE REPLACE'
+        if mosaic eq 1 then phast_do_swarp,image=state.cal_file_name
+        progress_bar->update,float(i+1)/num_files*100*(.75)
         ;compute zero-point
-        ;phast_calculate_zeropoint,state.cal_file_name,msgerr,external=external
+        phast_calculate_zeropoint,state.cal_file_name,msgerr,external=external
      endif
-     progress_bar->update,float(i)/num_files*100
+     progress_bar->update,float(i+1)/num_files*100
   endfor
   progress_bar->destroy
+  toc
 end
 
 ;----------------------------------------------------------------------
@@ -1206,10 +1252,10 @@ pro phast_do_swarp,image = image, flags = flags
   
   if not keyword_set(image) then image = state.imagename
   if not keyword_set(flags) then flags = state.swarp_flags
-  if not keyword_set(cat_name) then cat_name = state.sex_catalog_name
   
   cd, state.phast_dir
-  spawn, 'swarp ' + image + ' ' + flags
+  spawn, 'swarp ' + image + ' ' + flags + ' -IMAGEOUT_NAME ' + state.phast_dir+'/output/images/coadd.fits'
+  spawn, 'mv '+  state.phast_dir+'/output/images/coadd.fits' + ' ' + image
   cd, state.launch_dir
 end
 

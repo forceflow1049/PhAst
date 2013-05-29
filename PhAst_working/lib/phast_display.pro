@@ -376,9 +376,8 @@ pro phast_autoscale
     state.min_value = state.min_value - 1
     state.max_value = state.max_value + 1
   endif
-  
+
   state.asinh_beta = state.skysig
-  
   phast_set_minmax
 end
 

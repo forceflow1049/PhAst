@@ -753,6 +753,11 @@ pro phast_displayall
   ; zoomed without a change in scaling, then just call phast_refresh
   ; rather than this routine.
 
+  common phast_state
+
+  help, state.brightness,state.contrast,state.min_value,state.max_value
+  
+
   phast_scaleimage
   phast_makepan
   phast_refresh
@@ -792,7 +797,7 @@ pro phast_display_stars
         catalog_name = state.overlay_catList(state.overlay_catalog)
         
         widget_control,state.search_msg_id,set_value='Downloading catalog region...'
-        star_catalog = phast_get_stars(a,d,radius,AsOf=obsDate,catalog_name=catalog_name)
+        star_catalog = phast_get_stars(a,d,1.5*radius,AsOf=obsDate,catalog_name=catalog_name)
         image_archive[state.current_image_index]->set_catalog, star_catalog, catalog_name
      endif else begin
         star_catalog = image_archive[state.current_image_index]->get_catalog()
@@ -2821,8 +2826,8 @@ pro phast_resize
   window = (state.base_min_size > tmp_event)
   
   newbase = window - state.base_pad
-  newxsize = (tmp_event[0] - state.base_pad[0]) > 800; (state.base_min_size[0] - state.base_pad[0])
-  newysize = (tmp_event[1] - state.base_pad[1]) > 400;> $
+  newxsize = (tmp_event[0] - state.base_pad[0]) > 600; (state.base_min_size[0] - state.base_pad[0])
+  newysize = (tmp_event[1] - state.base_pad[1]) > 300;> $
   ;  (state.base_min_size[1] - state.base_pad[1])
   
   
@@ -3741,7 +3746,7 @@ pro phast_settitle, reset=reset
     title = strcompress('PhAst:  '+ name + '  ' + state.title_extras)
     
     if (title_object NE '') then  $
-      title = strcompress(title + ': ' + title_object)
+      title = strcompress(string(title) + ': ' + string(title_object))
       
     widget_control, state.base_id, tlb_set_title = title
   endelse

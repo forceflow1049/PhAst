@@ -1454,18 +1454,24 @@ pro phast_image_switch, index
   common phast_state
   common phast_images
   if state.num_images gt 0 then begin
+     print, 'here'
      ;save current stretch settings
-     ;; image_archive[state.current_image_index]->set_min_stretch, state.min_value
-     ;; image_archive[state.current_image_index]->set_max_stretch, state.max_value
+     image_archive[state.current_image_index]->set_min_stretch, state.min_value
+     image_archive[state.current_image_index]->set_max_stretch, state.max_value
+     image_archive[state.current_image_index]->set_brightness, state.brightness
+     image_archive[state.current_image_index]->set_contrast, state.contrast
+     ;switch images
      state.current_image_index = index
      main_image = image_archive[state.current_image_index]->get_image()
      state.imagename  = image_archive[state.current_image_index]->get_name()
      phast_setheader, image_archive[state.current_image_index]->get_header(/string)
      ;get new stretch settings
-     ;; state.min_value = image_archive[state.current_image_index]->get_min_stretch()
-     ;; state.max_value = image_archive[state.current_image_index]->get_max_stretch()
-     ;; phast_set_minmax
-
+     state.contrast = image_archive[state.current_image_index]->get_contrast()
+     state.brightness = image_archive[state.current_image_index]->get_brightness()
+     state.min_value = image_archive[state.current_image_index]->get_min_stretch()
+     state.max_value = image_archive[state.current_image_index]->get_max_stretch()
+     phast_stretchct
+     phast_set_minmax
      ;; counter_string = 'Cycle images: ' + strtrim(string(state.current_image_index+1),1) + ' of ' + strtrim(string(state.num_images),1)
      ;; ;update widgets
      ;; widget_control,state.image_counter_id,set_value= counter_string
@@ -1495,7 +1501,9 @@ pro phast_image__define
             astr:ptr_new(),$    ;holds astrometry data, if available
             rotation:ptr_new(),$;holds rotation state of image in deg
             min_stretch:ptr_new(),$;holds the stretch min for the image
-            max_stretch:ptr_new()$ ;holds the stretch max for the iamge
+            max_stretch:ptr_new(),$;holds the stretch max for the iamge
+            brightness: ptr_new(),$;holds the brightness of the stretch
+            contrast: ptr_new()$;holds the contrast of the stretch
            }
 end
 
@@ -1540,6 +1548,8 @@ pro phast_image::Cleanup
   ptr_free,self.astr
   ptr_free, self.min_stretch
   ptr_free, self.max_stretch
+  ptr_free, self.brightness
+  ptr_free, self.contrast
 end
 
 ;----------------------------------------------------------------------
@@ -1549,6 +1559,15 @@ function phast_image::get_astr
 ;routine to return astrometry data for the image
   
   return,*(self.astr)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_brightness
+  
+;routine to return the brightness of the image stretch
+  
+  return,*(self.brightness)
 end
 
 ;----------------------------------------------------------------------
@@ -1567,6 +1586,15 @@ function phast_image::get_catalog_type
 ;routine to return a catalog type
 
   return, *(self.catalog_type)
+end
+
+;----------------------------------------------------------------------
+
+function phast_image::get_contrast
+  
+;routine to return the contrast of the image stretch
+  
+  return,*(self.contrast)
 end
 
 ;----------------------------------------------------------------------
@@ -1673,6 +1701,8 @@ function phast_image::init
   self.rotation = ptr_new(/allocate)
   self.max_stretch = ptr_new(/allocate)
   self.min_stretch = ptr_new(/allocate)
+  self.brightness = ptr_new(0.5)
+  self.contrast = ptr_new(0.5)
   self.astr = ptr_new()  ;this will be allocated when astrometry data is present
   return,1
 end
@@ -1688,6 +1718,15 @@ end
 
 ;----------------------------------------------------------------------
 
+pro phast_image::set_brightness, b
+  
+;routine to set the brightness of the image stretch
+  
+ *(self.brightness) = b
+end
+
+;----------------------------------------------------------------------
+
 pro phast_image::set_catalog,new_catalog, type
   
 ;routine to set the astrometry info for the image
@@ -1696,6 +1735,15 @@ pro phast_image::set_catalog,new_catalog, type
   ptr_free, self.catalog_type
   self.catalog = ptr_new(new_catalog)
   self.catalog_type = ptr_new(type)
+end
+
+;----------------------------------------------------------------------
+
+pro phast_image::set_contrast, c
+  
+;routine to set the contrast of the image stretch
+  
+ *(self.contrast) = c
 end
 
 ;----------------------------------------------------------------------
@@ -2152,6 +2200,7 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
      if (fitsloc EQ '') then return ; 'cancel' button returns empty string
   endif else begin
      fitsfile = fitsfilename
+     num_new_images = 1
   endelse
   
   ;if adding a directory, expand the archive

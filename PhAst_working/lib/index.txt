@@ -39,9 +39,12 @@ phast_system: contains common blocks and archives and basic routines
      phast_image::astr_valid
      phast_image::catalog_valid
      phast_image::Cleanup
+     phast_image::get_asinh_beta
      phast_image::get_astr
+     phast_image::get_brightness
      phast_image::get_catalog
      phast_image::get_catalog_type
+     phast_image::get_contrast
      phast_image::get_header
      phast_image::get_image
      phast_image::get_max_stretch
@@ -52,6 +55,7 @@ phast_system: contains common blocks and archives and basic routines
      phast_image::get_rotation
      phast_image::get_size
      phast_image::init
+     phast_image::set_asinh_beta
      phast_image::set_astr
      phast_image::set_brightness
      phast_image::set_catalog
