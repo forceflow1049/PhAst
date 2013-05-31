@@ -2,5 +2,9 @@ New features:
 -New tabbed interface for easier image switching [Morgan Rehnberg]
 -Small mode for screens with minimal resolution [Morgan Rehnberg]
 -Separate stretch values for each image [Morgan Rehnberg]
+-Multi-image mosaics now supported with SWarp [Morgan Rehnberg]
+-NEO object ephemeris can now be retrieved and plotted [Morgan Rehnberg]
 Bugs fixed:
+-Fixed crash when training photometric aperature on object with infinite FWHM [Morgan Rehnberg]
+-Improved compatability when setting default FITS keywords during calibration [Morgan Rehnberg]
 
