@@ -864,32 +864,62 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
      endif
 
      size = size(main)                ;get image size
-     ra = sxpar(cal_science_head,'RA') ;get approx ra
-     dec = sxpar(cal_science_head,'DEC') ;get approx dec
-  ;convert to degrees
-     ra = 15*ten(ra)
-     dec = ten(dec)
-  ;get current EQUINOX
-     equinox = sxpar(cal_science_head,'EQUINOX')
-  ;if wcsKPNO21m NE 1 then precess,ra,dec,equinox,2000 ; precess to J2000
+
   
   ;write header values required for plate solution
      if not keyword_set(mosaic) then begin
-        sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
-        sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'
-        sxaddpar,cal_science_head,'CUNIT1','deg'
-        sxaddpar,cal_science_head,'CUNIT2','deg'
-        sxaddpar,cal_science_head,'CRPIX1',size[1]/2,format='E11.5'
-        sxaddpar,cal_science_head,'CRPIX2',size[2]/2,format='E11.5'
-        sxaddpar,cal_science_head,'CRVAL1',ra,format='E12.5'
-        sxaddpar,cal_science_head,'CRVAl2',dec,format='E12.5'
-        sxaddpar,cal_science_head,'CDELT1',state.fits_cdelt1,format='E14.7'
-        sxaddpar,cal_science_head,'CDELT2',state.fits_cdelt2,format='E14.7'
-        sxaddpar,cal_science_head,'CROTA1',state.fits_crota1,format='E11.5'
-        sxaddpar,cal_science_head,'CROTA2',state.fits_crota2,format='E11.5'
-        sxaddpar,cal_science_head,'EQUINOX',2000.0
-        sxaddpar,cal_science_head,'EPOCH',2000.0
-     endif else begin
+        temp = sxpar(cal_science_head,'CTYPE1',count=count)
+        if count eq 0 then begin
+           print, 'CTYPE keywords not found.  Setting to TAN projection...'
+           sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
+           sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'
+        endif
+        temp = sxpar(cal_science_head,'CUNIT1',count=count)
+        if count eq 0 then begin
+           print, 'CUNIT keywords not found.  Setting to degrees...'
+           sxaddpar,cal_science_head,'CUNIT1','deg'
+           sxaddpar,cal_science_head,'CUNIT2','deg'
+        endif
+        temp = sxpar(cal_science_head,'CRPIX1',count=count)
+        if count eq 0 then begin
+           print, 'CRPIX keywords not found.  Setting to image center...'
+           sxaddpar,cal_science_head,'CRPIX1',size[1]/2,format='E11.5'
+           sxaddpar,cal_science_head,'CRPIX2',size[2]/2,format='E11.5'
+        endif
+        temp = sxpar(cal_science_head,'CRVAL1',count=count)
+        if count eq 0 then begin
+           print, 'CRVAL keywords not found.  Trying to add approximate RA and Dec...'
+           ra = sxpar(cal_science_head,'RA') ;get approx ra
+           dec = sxpar(cal_science_head,'DEC') ;get approx dec
+                                ;convert to degrees
+           ra = 15*ten(ra)
+           dec = ten(dec)
+           sxaddpar,cal_science_head,'CRVAL1',ra,format='E12.5'
+           sxaddpar,cal_science_head,'CRVAl2',dec,format='E12.5'
+        endif
+        temp = sxpar(cal_science_head,'CDELT1',count=count)
+        if count eq 0 then begin
+           print, 'CDELT keywords not found.  Setting to user-supplied pixelscale...'
+           sxaddpar,cal_science_head,'CDELT1',state.fits_cdelt1,format='E14.7'
+           sxaddpar,cal_science_head,'CDELT2',state.fits_cdelt2,format='E14.7'
+        endif
+        temp = sxpar(cal_science_head,'CROTA1',count=count)
+        if count eq 0 then begin
+           print, 'CROTA keywords not found.  Setting to user-supplied values...'
+           sxaddpar,cal_science_head,'CROTA1',state.fits_crota1,format='E11.5'
+           sxaddpar,cal_science_head,'CROTA2',state.fits_crota2,format='E11.5'
+        endif
+        temp = sxpar(cal_science_head,'EQUINOX',count=count)
+        if count eq 0 or state.force_j2000 ne 0 then begin
+           print, 'EQUINOX keyword not found.  Setting to 2000.0...'
+           sxaddpar,cal_science_head,'EQUINOX',2000.0
+        endif
+        temp = sxpar(cal_science_head,'EPOCH',count=count)
+        if count eq 0 or state.force_j2000 ne 0 then begin
+           print, 'EPOCH keyword not found.  Setting to 2000.0...'
+           sxaddpar,cal_science_head,'EPOCH',2000.0
+        endif
+     endif else begin ;remove any TNX parameters presetnt
         sxaddpar,cal_science_head,'CTYPE1','RA---TAN'
         sxaddpar,cal_science_head,'CTYPE2','DEC--TAN'        
         sxdelpar,cal_science_head, 'WAT0_001'
@@ -906,6 +936,7 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
         sxdelpar,cal_science_head, 'CHECKSUM'
         sxdelpar,cal_science_head, 'DATASUM'
         if state.over_toggle eq 1 then begin ;update NAXIS keywords
+           print, 'Updating NAXIS keywords after trimming overscan region...'
            sxaddpar,cal_science_head, 'NAXIS1',n_elements(main[*,0])
            sxaddpar,cal_science_head, 'NAXIS2',n_elements(main[0,*])
         endif
@@ -1292,11 +1323,9 @@ pro phast_do_sextractor,image = image, flags = flags, cat_name = cat_name
   
   if not keyword_set(image) then image = state.imagename
   if not keyword_set(flags) then flags = state.sex_flags
-  print, flags
   if not keyword_set(cat_name) then cat_name = state.sex_catalog_name
   
   cd, state.phast_dir
-  ;textstr = 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
   spawn, 'sex ' + image + ' ' + flags +  ' -CATALOG_NAME ' + cat_name
   cd, state.launch_dir
 end

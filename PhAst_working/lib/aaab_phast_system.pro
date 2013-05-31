@@ -619,10 +619,15 @@ pro phast_draw_blink_event, event
            endcase
         end
      end
-     2: phast_draw_motion_event, event ; motion event
+     2: begin
+        phast_draw_motion_event, event ; motion event
+        widget_control, state.draw_widget_id, /sensitive
+        phast_resetwindow
+        return
+     end
   endcase
-        
-  widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+
+  widget_control, state.draw_widget_id, /sensitive, /input_focus
   phast_resetwindow
 end
 
@@ -659,6 +664,8 @@ pro phast_draw_color_event, event
         endif else begin
            phast_draw_motion_event, event
         endelse
+        widget_control, state.draw_widget_id, /sensitive
+        return
      end
   endcase
   
@@ -692,7 +699,7 @@ pro phast_draw_event, event
      phast_draw_keyboard_event, event
   
   if (xregistered('phast', /noshow)) then $
-     widget_control, state.draw_widget_id, /sensitive, /input_focus
+     widget_control, state.draw_widget_id, /sensitive;, /input_focus
           
 end
 
@@ -861,7 +868,11 @@ pro phast_draw_phot_event, event
      endcase
   endif
   
-  if (event.type EQ 2) then phast_draw_motion_event, event
+  if (event.type EQ 2) then begin
+     phast_draw_motion_event, event
+     widget_control, state.draw_widget_id, /sensitive
+     return
+  endif
   
   widget_control, state.draw_widget_id, /sensitive, /input_focus
 end
@@ -940,12 +951,14 @@ pro phast_draw_vector_event, event
         if (state.vectorpress EQ 1) then phast_drawvector, event
         if (state.vectorpress EQ 2) then phast_drawvector, event
         if (state.vectorpress EQ 4) then phast_drawdepth, event
+        widget_control, state.draw_widget_id, /sensitive
+        return
      end
      
      else:
   endcase
   
-  widget_control, state.draw_widget_id, /sensitive ;, /input_focus
+  widget_control, state.draw_widget_id, /sensitive, /input_focus
 end
 
 ;------------------------------------------------------------------
@@ -966,7 +979,11 @@ pro phast_draw_zoom_event, event
      endcase
   endif
   
-  if (event.type EQ 2) then phast_draw_motion_event, event
+  if (event.type EQ 2) then begin
+     phast_draw_motion_event, event
+     widget_control, state.draw_widget_id, /sensitive
+     return
+  endif
   
   if (xregistered('phast', /noshow)) then $
      widget_control, state.draw_widget_id, /sensitive, /input_focus
@@ -2364,6 +2381,7 @@ pro phast_read_config
     for i=0, n_elements(var)-1 do begin
       case strlowcase(strtrim(var[i])) of
                                 ;calibration
+         'force_j2000': state.force_j2000 = fix(val[i])
          'bias_file': begin
             state.bias_filename = val[i]
             fits_read,state.bias_filename,cal_bias,cal_flat_head

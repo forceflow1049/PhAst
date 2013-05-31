@@ -288,9 +288,11 @@ pro phast_apphot_event, event
     end
     
     'aperTrain': begin
-      state.phot_aperFWHM = round(100*state.objfwhm)/100.0
-      phast_setAps, state.objfwhm, 0
-      phast_apphot_refresh
+       if finite(state.objfwhm) then begin
+          state.phot_aperFWHM = round(100*state.objfwhm)/100.0
+          phast_setAps, state.objfwhm, 0
+          phast_apphot_refresh
+       endif else print, "Warning: object has infinite FWHM.  Cannot adust aperture."
     end
     
     'spectralLtr': begin
@@ -460,12 +462,25 @@ pro phast_apphot_refresh
     flux = !values.F_NAN
     state.photwarning = 'Warning: Aperture Outside Image Border!'
   endif
-  
+
   ; make sure there aren't NaN values in the apertures.
-  minx =                    0 > (x - state.outersky)
-  maxx = (x + state.outersky) < (state.image_size[0] - 1)
-  miny =                    0 > (y - state.outersky)
-  maxy = (y + state.outersky) < (state.image_size[1] - 1)
+  minx = (0 > (x - state.outersky)) < (state.image_size[0] - 1)
+  maxx = ((x + state.outersky) < (state.image_size[0] - 1)) > 0
+  miny = (0 > (y - state.outersky)) < (state.image_size[1] - 1)
+  maxy = ((y + state.outersky) < (state.image_size[1] - 1)) > 0
+
+  ; make sure min is less than max.  else, switch
+  if minx gt maxx then begin
+     temp = minx
+     minx = maxx
+     maxx = temp
+  endif
+  if miny gt maxy then begin
+     temp = miny
+     miny = maxy
+     maxy = temp
+  endif
+
   
   subimg = main_image[minx:maxx, miny:maxy]
   if (finite(mean(subimg)) EQ 0) then begin
@@ -926,11 +941,24 @@ pro phast_imcenterf, xcen, ycen
   yy = state.cursorpos[1]
   
   ; make sure there aren't NaN values in the apertures.
-  minx = 0 > (xx - state.outersky)
-  maxx = (xx + state.outersky) < (state.image_size[0] - 1)
-  miny = 0 > (yy - state.outersky)
-  maxy = (yy + state.outersky) < (state.image_size[1] - 1)
-  
+  minx = (0 > (xx - state.outersky)) < (state.image_size[0] - 1)
+  maxx = ((xx + state.outersky) < (state.image_size[0] - 1)) > 0
+  miny = (0 > (yy - state.outersky)) < (state.image_size[1] - 1)
+  maxy = ((yy + state.outersky) < (state.image_size[1] - 1)) > 0
+
+  ; make sure min is less than max.  else, switch
+
+  if minx gt maxx then begin
+     temp = minx
+     minx = maxx
+     maxx = temp
+  endif
+  if miny gt maxy then begin
+     temp = miny
+     miny = maxy
+     maxy = temp
+  endif
+
   subimg = main_image[minx:maxx, miny:maxy]
   if (finite(mean(subimg)) EQ 0) then begin
     xcen = xx

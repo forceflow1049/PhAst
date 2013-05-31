@@ -164,6 +164,7 @@ pro phast_initcommon, phast_dir, launch_dir, small
     }
     
   state = {                $
+    force_j2000: 0, $      ;force a J2000 equinox during calibration?
     batch_mef_toggle: 0, $ ;treat mef images as mosaics?
     batch_mef_toggle_id:0L,$;widget ID for batch mef toggle
     tb_mpc_toggle: 0, $    ;is the MPC toolbox opened?
