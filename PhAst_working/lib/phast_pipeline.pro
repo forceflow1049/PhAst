@@ -509,6 +509,28 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
   phast_do_sextractor, image=fitsfile, flags=textstr, cat_name=state.phast_dir+'/output/catalogs/zeropoint.cat'
   
   readcol, state.phast_dir+'/output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
+
+  ;reduce detections for very big images (improve speed)
+  if n_elements(im_ra) gt 4000 then begin
+     print, "Large number of sources detected.  Reducing this to improve speed..."
+     temp_ra = list()
+     temp_dec = list()
+     temp_instr = list()
+     temp_errinstr = list()
+     for cutdown=0, n_elements(im_ra)-1 do begin
+        rand = randomu(undef) ;generate a random numbner in range [0,1]
+        if rand lt 0.25 then begin ;reduce array to 25% of previous size
+           temp_ra.add,im_ra[cutdown]
+           temp_dec.add, im_dec[cutdown]
+           temp_instr.add, instr[cutdown]
+           temp_errinstr.add, errinstr[cutdown]
+        endif
+     endfor
+     im_ra = temp_ra.toarray()
+     im_dec = temp_dec.toarray()
+     instr = temp_instr.toarray()
+     errinstr = temp_errinstr.toarray()
+  endif
   
    ; qualify SExtractor detections
   Instr( where(   flags gt  0  ) ) = !values.F_NAN  ; avoid complicated/corrupted detections

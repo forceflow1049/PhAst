@@ -803,7 +803,7 @@ function phast_ExtAdjust, ExtMethod, MagType, magVal, magColor,header=header,ast
   common phast_filters
 
   if not keyword_set(header) then header = *state.head_ptr
-  if not keyword_set(astr) then astr = *state.astr_ptr
+  if not keyword_set(astr) and ptr_valid(state.astr_ptr) then astr = *state.astr_ptr
 
   posFilter = sxpar(header,filters.fitsKey)
   case ExtMethod of

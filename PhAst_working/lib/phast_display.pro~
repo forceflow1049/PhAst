@@ -376,9 +376,8 @@ pro phast_autoscale
     state.min_value = state.min_value - 1
     state.max_value = state.max_value + 1
   endif
-  
+
   state.asinh_beta = state.skysig
-  
   phast_set_minmax
 end
 
@@ -752,11 +751,6 @@ pro phast_displayall
   ; passed to phast.  If the display image has just been moved around or
   ; zoomed without a change in scaling, then just call phast_refresh
   ; rather than this routine.
-
-  common phast_state
-
-  help, state.brightness,state.contrast,state.min_value,state.max_value
-  
 
   phast_scaleimage
   phast_makepan
