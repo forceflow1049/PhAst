@@ -397,7 +397,27 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
 
   ;get astrometry pointer
   extast, head, astr, noparams
-  
+
+  xsize = sxpar(head, 'NAXIS1')
+  ysize = sxpar(head, 'NAXIS2')
+  xscale = sxpar(head, 'CDELT1',count=count)
+  if count eq 0 then xscale = sxpar(head,'CD1_1',count=count)
+  if count eq 0 then begin
+     print, 'Error: No plate scale found in FITS header.  Defaulting to slow mode for zero-point computation...'
+     fast_mode = 0
+     xscale = 0
+  endif
+  yscale = sxpar(head, 'CDELT2',count=count)
+  if count eq 0 then yscale = sxpar(head,'CD2_2',count=count)
+  if count eq 0 then begin
+     print, 'Error: No plate scale found in FITS header.  Defaulting to slow mode for zero-point computation...'
+     fast_mode = 0
+     yscale = 0
+  endif
+
+  area = (xsize*abs(xscale))*(ysize*abs(yscale)) ;in degrees^2
+  growth_factor = sqrt(area/0.0278) ;amount over the standard image size
+
   exposure  = sxpar(head,'EXPTIME')
   posFilter = sxpar(head,filters.fitsKey)
   pixelscale = sxpar(head,'PIXELSCALE')/0.000277777777777778d
@@ -510,33 +530,13 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
   
   readcol, state.phast_dir+'/output/catalogs/zeropoint.cat', im_RA, im_Dec, Instr, errInstr, flags, comment='#', Format='D,D,D,D,I', /silent
 
-  ;reduce detections for very big images (improve speed)
-  if n_elements(im_ra) gt 4000 then begin
-     print, "Large number of sources detected.  Reducing this to improve speed..."
-     temp_ra = list()
-     temp_dec = list()
-     temp_instr = list()
-     temp_errinstr = list()
-     for cutdown=0, n_elements(im_ra)-1 do begin
-        rand = randomu(undef) ;generate a random numbner in range [0,1]
-        if rand lt 0.25 then begin ;reduce array to 25% of previous size
-           temp_ra.add,im_ra[cutdown]
-           temp_dec.add, im_dec[cutdown]
-           temp_instr.add, instr[cutdown]
-           temp_errinstr.add, errinstr[cutdown]
-        endif
-     endfor
-     im_ra = temp_ra.toarray()
-     im_dec = temp_dec.toarray()
-     instr = temp_instr.toarray()
-     errinstr = temp_errinstr.toarray()
-  endif
+
   
    ; qualify SExtractor detections
   Instr( where(   flags gt  0  ) ) = !values.F_NAN  ; avoid complicated/corrupted detections
   Instr( where(   Instr ge 99.0) ) = !values.F_NAN  ; avoid sextractor missing value code (99.0)
   Instr( where(errInstr ge 99.0) ) = !values.F_NAN  ; avoid sextractor missing value code (99.0)
-  
+
   signal = 10^(-0.4*Instr)  &  sigma = 10^(-0.4*errInstr)  &  SNR = signal/sigma 
   Instr( where( SNR lt minSNR) ) = !values.F_NAN  ; avoid low SNR detections
       
@@ -550,13 +550,62 @@ pro phast_calculate_zeropoint,fitsfile,msgarr,external=external
     msgarr(0) = 'Photometric zeropoint can not be determined'
     msgarr(1) = 'Only ' + string(n_elements(good),'I1') + ' detections with SNR > ' + string(minSNR<99.9,'(F4.1)')
     return
-  endif else begin
+  endif else begin 
     if n_elements(good) lt n_elements(Instr) then begin
       index = indgen(n_elements(Instr))
       remove, good, index ; index is now bad points
       remove, index, im_RA, im_Dec, Instr, errInstr, flags
     endif
-  endelse
+ endelse
+
+  min_count =  fix(50*growth_factor) ;want more stars than this
+  max_count = fix(100*growth_factor) ;don't need more stars than this
+
+  if state.fast_zeropoint eq 1 and n_elements(im_RA) gt max_count then begin ;need to further reduce star count
+     print, "Large number of sources detected.  Reducing this to improve speed..."
+     signal = 10^(-0.4*Instr)
+     sigma = 10^(-0.4*errInstr)
+     SNR = signal/sigma
+     if n_elements(Instr(where( SNR lt 15))) ge min_count then begin ;don't want too few
+        Instr(where( SNR lt 15)) = !values.F_NAN 
+        good = where( finite(Instr)) ; reduce to surviving detections
+        index = indgen(n_elements(Instr))
+        remove, good, index     ; index is now bad points
+        remove, index, im_RA, im_Dec, Instr, errInstr, flags
+        if n_elements(im_RA) gt max_count then begin ;STILL need to reduce count
+           signal = 10^(-0.4*Instr)
+           sigma = 10^(-0.4*errInstr)
+           SNR = signal/sigma
+           if n_elements(Instr(where( SNR lt 20))) ge min_count then begin ;don't want too few
+              Instr(where( SNR lt 20)) = !values.F_NAN 
+              good = where( finite(Instr)) ; reduce to surviving detections
+              index = indgen(n_elements(Instr))
+              remove, good, index ; index is now bad points
+              remove, index, im_RA, im_Dec, Instr, errInstr, flags
+              if n_elements(im_ra) gt max_count then begin ;choose randomly
+                 temp_ra = list()
+                 temp_dec = list()
+                 temp_instr = list()
+                 temp_errinstr = list()
+                 rand_percent = float(max_count)/n_elements(im_ra)
+                 for cutdown=0, n_elements(im_ra)-1 do begin
+                    rand = randomu(undef) ;generate a random numbner in range [0,1]
+                    if rand lt rand_percent then begin ;reduce array to approximately max_count
+                       temp_ra.add,im_ra[cutdown]
+                       temp_dec.add, im_dec[cutdown]
+                       temp_instr.add, instr[cutdown]
+                       temp_errinstr.add, errinstr[cutdown]
+                    endif
+                 endfor
+                 im_ra = temp_ra.toarray()
+                 im_dec = temp_dec.toarray()
+                 instr = temp_instr.toarray()
+                 errinstr = temp_errinstr.toarray()
+              endif              
+           endif
+        endif
+     endif
+  endif 
   
   ; 4) Match catalog objects to image
   Cat = make_array(1,n_elements(im_RA),/DOUBLE,VALUE=!VALUES.f_nan) ; will hold cat magnitude of matching star
@@ -724,7 +773,9 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
 
   if not keyword_set(input_file) then input_file = state.cal_file_name
   if not keyword_set(output_file) then output_file = state.cal_file_name
-  
+
+
+
   if keyword_set(mosaic) then begin
      fits_info,input_file,n_ext=num_ext,/silent
      ;spawn, 'cp '+input_file+' '+output_file
@@ -1283,6 +1334,14 @@ pro phast_do_batch
     ; fits_read,filelist[i],cal_science,cal_science_head
      split = strsplit(filelist[i],'/\.',count=count,/extract)
      state.cal_file_name = state.phast_dir+'/output/images/'+split[count-2]+'.'+split[count-1]
+     
+     file_exists = file_test(state.cal_file_name)
+     if file_exists eq 1 then begin
+        answer = dialog_message('File ' + state.cal_file_name + ' already exists! Overwrite this file?',/question,/center)
+        if answer eq 'Yes' then begin
+           spawn, 'rm ' + state.cal_file_name
+        endif else goto, batch_skip_image
+     endif
      phast_calibrate, input_file=filelist[i],output_file=state.cal_file_name,mosaic=mosaic
      
      progress_bar->update,float(i+1)/num_files*100*(.25)
@@ -1296,6 +1355,7 @@ pro phast_do_batch
         ;compute zero-point
         phast_calculate_zeropoint,state.cal_file_name,msgerr,external=external
      endif
+     batch_skip_image:
      progress_bar->update,float(i+1)/num_files*100
   endfor
   progress_bar->destroy

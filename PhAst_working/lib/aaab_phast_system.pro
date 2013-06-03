@@ -2429,6 +2429,7 @@ pro phast_read_config
          'tb_mpc_visible': state.tb_mpc_visible = fix(val[i])
                                 ;calibration
          'cal_file_name': state.cal_file_name = val[i]
+         'fast_zeropoint': state.fast_zeropoint = fix(val[i])
                                 ;photometery
          'photfilename': state.photfilename = val[i]
          'aprad': state.aprad = float(val[i])

@@ -164,6 +164,7 @@ pro phast_initcommon, phast_dir, launch_dir, small
     }
     
   state = {                $
+    fast_zeropoint: 1, $   ;use fast mode for zeropoint computation?
     force_j2000: 0, $      ;force a J2000 equinox during calibration?
     batch_mef_toggle: 0, $ ;treat mef images as mosaics?
     batch_mef_toggle_id:0L,$;widget ID for batch mef toggle
