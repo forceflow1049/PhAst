@@ -4,6 +4,8 @@ New features:
 -Separate stretch values for each image [Morgan Rehnberg]
 -Multi-image mosaics now supported with SWarp [Morgan Rehnberg]
 -NEO object ephemeris can now be retrieved and plotted [Morgan Rehnberg]
+-Zero-point calculation now integrated into batch processing [Morgan Rehnberg]
+-Zero-point calculation now used only high S/N stars in large fields [Morgan Rehnberg]
 Bugs fixed:
 -Fixed crash when training photometric aperature on object with infinite FWHM [Morgan Rehnberg]
 -Improved compatability when setting default FITS keywords during calibration [Morgan Rehnberg]

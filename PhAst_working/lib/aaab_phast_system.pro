@@ -1,6 +1,6 @@
 ;-------------------------------------------------------------------
 
-pro phastslicer_event, event
+pro phastslicerevent, event
 
   ; event handler for data cube slice selector widgets
 
@@ -1178,6 +1178,7 @@ pro phast_event, event
      end
      'create_mpc_report': phast_mpc_report
      'overlay_ephem': begin
+        if state.num_images eq 0 then return
         if image_archive[state.current_image_index]->astr_valid() then begin
            ;get the name of the current object
            name = image_archive[state.current_image_index]->get_obj_name()
@@ -1828,7 +1829,7 @@ pro phast_image::set_image, image
   
   *(self.image) = image
   image_size= size(image)
-  *(self.size) = [image_size[2],image_size[3]]
+  *(self.size) = [image_size[1],image_size[2]]
   *(self.min_stretch) = min(image) > 0
   *(self.max_stretch) = max(image)
   
@@ -2795,7 +2796,7 @@ pro phast_remove_image,index=index,all=all
         phast_settitle, /reset
         phast_base_image
      endelse
-  endif else begin
+  endif else begin ;keyword \all set
      state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
      for i=0,state.num_images-1 do begin
         obj_destroy,image_archive[i]
@@ -3275,7 +3276,8 @@ pro phast_startup, phast_dir, launch_dir, small
                   {cw_pdmenu_s, 2, 'Photometric zero-point'},$
                   {cw_pdmenu_s, 1, 'Help'}, $ ; help menu
                   {cw_pdmenu_s, 0, 'PHAST Help'},$
-                  {cw_pdmenu_s, 0, 'Debug info'},$                  
+                  {cw_pdmenu_s, 0, 'Debug info'},$
+                  {cw_pdmenu_s, 0, 'Stop execution'},$
                   {cw_pdmenu_s, 2, 'Check for updates'}$
                   ]
           
@@ -3706,11 +3708,13 @@ pro phast_topmenu_event, event
      ;' FIRST': phast_getfirst
      'LoadRegions': phast_loadregion
      'SaveRegions': phast_saveregion
-     'Remove current image': phast_remove_image,index=state.current_image_index
+     'Remove current image': if state.num_images gt 0 then phast_remove_image,index=state.current_image_index
      'Remove all images': begin
-        widget_control,/hourglass
-        state.current_image_index = 0
-        phast_remove_image,/all
+        if state.num_images gt 0 then begin
+           widget_control,/hourglass
+           state.current_image_index = 0
+           phast_remove_image,/all
+        endif
      end
      'Clear output directory': begin
         result = dialog_message('Empty output/images/ ?  This will remove all files from this directory',/question,/center)
@@ -3871,6 +3875,7 @@ pro phast_topmenu_event, event
      ; Help options:
      'PHAST Help': phast_help
      'Debug info': phast_debug_info
+     'Stop execution': stop
      'Check for updates': phast_check_updates
      
      else: print, 'Unknown event in file menu!'
