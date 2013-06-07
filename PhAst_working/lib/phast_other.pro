@@ -253,6 +253,18 @@ function phast_get_obs_time, header
         jd = JULDAY(MM,DD,YYYY,HH,Min,Sec)
         break
      endif
+     datestr = sxpar(header,'DATE-OBS',count=date_count)
+     timestr = sxpar(header,'UTC-OBS',count=time_count)
+     if (date_count ne 0) and (time_count ne 0) then begin
+        YYYY =  long(strmid(datestr,0,4))
+        MM =  long(strmid(datestr,5,2))
+        DD =  long(strmid(datestr,8,2))
+        HH =  long(strmid(timestr,0,2))
+        Min =  long(strmid(timestr,3,2))
+        Sec = float(strmid(timestr,6))
+        jd = JULDAY(MM,DD,YYYY,HH,Min,Sec)        
+        break
+     endif
      print, 'Supported date keyword not found in FITS header.'
      break
   endwhile

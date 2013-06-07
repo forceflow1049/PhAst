@@ -1238,6 +1238,7 @@ pro phast_event, event
            phast_plot1region, nplot
         endif else tmp = dialog_message('You must have an astrometric solution to retrieve an ephemeris!',/error,/center)
      end
+     'find_moving_object': phast_detect_moving_objects
      ;align
      'align_toggle': begin
         if state.align_toggle eq 0 then begin
@@ -1839,7 +1840,7 @@ end
 
 pro phast_image::set_max_stretch, c
   
-;routine to set the contrast stretch for the image
+;routine to set the max stretch for the image
   
   *(self.max_stretch) = c
 end
@@ -2326,6 +2327,12 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
      if (cancelled EQ 1) then begin
         newimage = 0
         return
+     endif
+
+     if keyword_set(dir) then begin
+        phast_getstats, align=state.default_align
+        phast_autoscale
+        phast_set_minmax
      endif
      
     ; check for 2d image or 3d cube, and store the header if all is well:
@@ -3499,6 +3506,7 @@ pro phast_startup, phast_dir, launch_dir, small
      mpc_button_box_1 = widget_base(state.mpc_box_id,/row)
      create_mpc_report = widget_button(mpc_button_box_1,value='Start MPC report',uvalue='create_mpc_report')
      overlay_ephem = widget_button(mpc_button_box_1,value='Overlay Ephemeris',uvalue='overlay_ephem')
+     mod_button = widget_button(state.mpc_box_id,value='Find moving objects',uvalue='find_moving_object')
   endif
   
   ;; state.draw_window_size[1] = state.draw_window_size[1] < $

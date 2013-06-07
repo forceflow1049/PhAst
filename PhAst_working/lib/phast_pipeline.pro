@@ -1267,6 +1267,157 @@ pro phast_combine_gui_event,event
     'done':widget_control,event.top,/destroy    
   endcase
 end
+
+;----------------------------------------------------------------------
+
+pro phast_detect_moving_objects
+
+;routine to detect a moving object in a series of images
+
+  common phast_state
+  common phast_images
+  common phast_pdata
+
+  widget_control,/hourglass
+
+;create array to hold data
+  x_data_array = ptrarr(state.num_images,/allocate)
+  y_data_array = ptrarr(state.num_images,/allocate)
+  size_data_array = ptrarr(state.num_images,/allocate)
+
+;run SExtractor on each image
+  for moving_index=0, state.num_images-1 do begin
+     phast_do_sextractor, image=image_archive[moving_index]->get_name(), flags=' -CATALOG_TYPE ASCII_HEAD -PARAMETERS_NAME moving.param',cat_name=state.phast_dir+'/output/catalogs/moving'+strtrim(string(moving_index),2)+'.cat'
+     readcol, state.phast_dir+'/output/catalogs/moving'+strtrim(string(moving_index),2)+'.cat', *(x_data_array[moving_index]),*(y_data_array[moving_index]),*(size_data_array[moving_index]),skipline=3  
+  endfor
+  
+;find objects that appear in multiple images
+  thresh = 2.0 ;must be within x pixels
+  size_thresh = 1.1 ;semi-major axis must be larger than x pixels
+  same_array = ptrarr(state.num_images,/allocate)
+  for moving_index=0, state.num_images-2 do begin ;compare successive pairs of images
+     *(same_array[moving_index]) = list()
+     for points_index=0, n_elements(*(x_data_array[moving_index]))-1 do begin
+        match = where((abs((*(x_data_array[moving_index]))[points_index]-*(x_data_array[moving_index+1])) lt thresh and abs((*(y_data_array[moving_index]))[points_index]-*(y_data_array[moving_index+1])) lt thresh) or ((*(size_data_array[moving_index]))[points_index] lt size_thresh) ,/null)
+        if  n_elements(match) ne 0 then *(same_array[moving_index]).add, points_index
+     endfor
+  endfor
+  *(same_array[-1]) = list()
+  for points_index=0, n_elements(*(x_data_array[-1]))-1 do begin
+     if  n_elements(where(abs((*(x_data_array[-1]))[points_index]-*(x_data_array[-2])) lt thresh and abs((*(y_data_array[-1]))[points_index]-*(y_data_array[-2])) lt thresh or ((*(size_data_array[-1]))[points_index] lt size_thresh),/null)) ne 0 then *(same_array[-1]).add, points_index
+  endfor
+  
+;remove these objects
+  for moving_index=0, state.num_images-1 do begin
+     remove,(*(same_array[moving_index]))->toarray(),*(x_data_array[moving_index]),*(y_data_array[moving_index]), *(size_data_array[moving_index])
+  endfor
+
+;eliminate points without a nearby point in the prevoius or next image
+  match_thresh = 50
+  iso_points_array = ptrarr(state.num_images,/allocate) ;isolated points
+
+  ;handle first image
+  (*(iso_points_array[0])) = list()
+  for j=0, n_elements(*(x_data_array[0]))-1 do begin ;cycle points
+     nearby = where((abs((*(x_data_array[0]))[j] - *(x_data_array[1])) lt match_thresh and abs((*(y_data_array[0]))[j] - *(y_data_array[1])) lt match_thresh),/null)
+     if n_elements(nearby) eq 0 then (*(iso_points_array[0])).add, j
+  endfor  
+  for i=1, state.num_images-2 do begin ;cycle images
+     (*(iso_points_array[i])) = list()
+     for j=0, n_elements(*(x_data_array[i]))-1 do begin ;cycle points
+        nearby = where((abs((*(x_data_array[i]))[j] - *(x_data_array[i-1])) lt match_thresh and abs((*(y_data_array[i]))[j] - *(y_data_array[i-1])) lt match_thresh) or (abs((*(x_data_array[i]))[j] - *(x_data_array[i+1])) lt match_thresh and abs((*(y_data_array[i]))[j] - *(y_data_array[i+1])) lt match_thresh),/null)
+        if n_elements(nearby) eq 0 then (*(iso_points_array[i])).add, j
+     endfor
+  endfor
+  ;handle last image
+  (*(iso_points_array[-1])) = list()
+  for j=0, n_elements(*(x_data_array[-1]))-1 do begin ;cycle points
+     nearby = where((abs((*(x_data_array[-1]))[j] - *(x_data_array[-2])) lt match_thresh and abs((*(y_data_array[-1]))[j] - *(y_data_array[-2])) lt match_thresh),/null)
+     if n_elements(nearby) eq 0 then (*(iso_points_array[-1])).add, j
+  endfor  
+
+  ;remove these points
+  for moving_index=0, state.num_images-1 do begin
+     remove,(*(iso_points_array[moving_index]))->toarray(),*(x_data_array[moving_index]),*(y_data_array[moving_index]), *(size_data_array[moving_index])
+  endfor
+
+  ;compute lines through remaining points
+  min_chi = 9999
+  image1_point = -9999
+  image2_point = -9999
+  image3_point = -9999
+  for i=0, n_elements(*(x_data_array[0]))-1 do begin ;first image points
+     for J=0, n_elements(*(x_data_array[1]))-1 do begin ;second image points
+        for k=0, n_elements(*(x_data_array[2]))-1 do begin ;third image points
+           temp = linfit([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k]],[(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k]],chisq=chisq)
+           if chisq lt min_chi then begin
+              min_chi = chisq
+              image1_point = i
+              image2_point = j
+              image3_point = k
+           endif
+        endfor
+     endfor
+  endfor
+
+  ;repeat from other end of sequence
+  min_chi = 9999
+  imageneg1_point = -9999
+  imageneg2_point = -9999
+  imageneg3_point = -9999
+  for i=0, n_elements(*(x_data_array[-1]))-1 do begin ;first image points
+     for J=0, n_elements(*(x_data_array[-2]))-1 do begin ;second image points
+        for k=0, n_elements(*(x_data_array[-3]))-1 do begin ;third image points
+           temp = linfit([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k]],[(*(y_data_array[0]))[-1],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k]],chisq=chisq)
+           if chisq lt min_chi then begin
+              min_chi = chisq
+              imageneg1_point = i
+              imageneg2_point = j
+              imageneg3_point = k
+           endif
+        endfor
+     endfor
+  endfor
+
+  ;use only these points
+  x_points = fltarr(6)
+  y_points = fltarr(6)
+  x_points[0] = (*(x_data_array[0]))[image1_point]
+  x_points[1] = (*(x_data_array[1]))[image2_point]
+  x_points[2] = (*(x_data_array[2]))[image3_point]
+  x_points[3] = (*(x_data_array[-1]))[imageneg1_point]
+  x_points[4] = (*(x_data_array[-2]))[imageneg2_point]
+  x_points[5] = (*(x_data_array[-3]))[imageneg3_point]
+  y_points[0] = (*(y_data_array[0]))[image1_point]
+  y_points[1] = (*(y_data_array[1]))[image2_point]
+  y_points[2] = (*(y_data_array[2]))[image3_point]
+  y_points[3] = (*(y_data_array[-1]))[imageneg1_point]
+  y_points[4] = (*(y_data_array[-2]))[imageneg2_point]
+  y_points[5] = (*(y_data_array[-3]))[imageneg3_point]
+
+
+
+  ;plot detections
+  colors= ['blue','green','red','yellow', 'cyan']
+  colorcode = colors[1]
+  circlesize = 7   &  circletext = strtrim(string(circlesize))
+  fontsize = 1.75  &    fonttext = strtrim(string(fontsize))
+  for i = 0, 5 do begin
+     if nplot lt maxplot then begin
+        nplot++
+        region_str = 'circle('+strtrim(string(x_points[i]),2)+', '+strtrim(string(y_points[i]),2)+', ' $
+                     + circletext + ') # color=' + colorcode
+        
+           options = {color:colorcode,thick:fonttext}
+           options.color = phast_icolor(options.color)
+           pstruct = {type:'region',reg_array:[region_str],options:options}
+           plot_ptr[nplot] =ptr_new(pstruct)
+           phast_plotwindow
+           phast_plot1region,nplot
+        endif
+  endfor
+end
+
 ;----------------------------------------------------------------------
 
 pro phast_do_all
