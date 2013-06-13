@@ -2457,6 +2457,7 @@ pro phast_read_config
             state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
             state.fits_cdelt2 = -state.fits_cdelt1
          end
+         'phot_coord': state.phot_coord = fix(val[i])
                                 ;MPC reporting
          'mpc_net': mpc.net = val[i]
          'mpc_com': mpc.com = val[i]
@@ -2486,7 +2487,7 @@ pro phast_read_config
          else: print, 'Parameter '+var[i]+' not found in phast_state!'
       endcase
    endfor
-                                ;
+ endif                          ;
     ;now, process any state defaults based on inputs
     if state.pixelscale le 0 then begin
        print, 'Warning: CCD pixel scale has not been set.  Defaulting to 1.0" per pixel.'
@@ -2507,12 +2508,10 @@ pro phast_read_config
     ;
     ; set photometric apertures based on typical object fwhm to be consistent with sextractor apertures
     if finite(state.objfwhm) then begin
+       print, 'here'
         state.objfwhm = state.objfwhm / state.pixelScale
         phast_setAps, state.objfwhm, 0
-    endif
-    
-  endif
-  
+    endif  
 end
 
 ;-----------------------------------------------------------------------------------------

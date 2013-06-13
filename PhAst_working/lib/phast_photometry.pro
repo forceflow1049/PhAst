@@ -352,23 +352,27 @@ pro phast_apphot_event, event
     'photprint': begin
       if (state.photprint EQ 0) then begin
       
-        photfilename = dialog_pickfile(file = state.photfilename, $
+        state.photfilename = dialog_pickfile(file = 'phastphot.dat', $
           dialog_parent =  state.base_id, $
           path = state.current_dir, $
           get_path = tmp_dir, $
           /write)
           
-        if (photfilename EQ '') then return
-        
+        if (state.photfilename EQ '') then return
+
         ; write header to output file
-        openw, photfile, photfilename, /get_lun
+        openw, photfile, state.photfilename, /get_lun
         state.photfile = photfile
         if (state.magunits EQ 0) then begin
-          photstring1 = '   x        y      r  insky outsky      sky         counts        err     fwhm'
+           if state.phot_coord eq 1 then begin
+              photstring1 = ' RA (deg)  Dec (deg)    r  insky outsky      sky         counts        err     fwhm'
+           endif else photstring1 = '   x        y      r  insky outsky      sky         counts        err     fwhm'
         endif else begin
-          photstring1 = '   x        y      r  insky outsky      sky          mag          err     fwhm'
+           if state.phot_coord eq 1 then begin
+              photstring1 = ' RA (deg)   Dec (deg)    r  insky outsky      sky          mag          err     fwhm'
+           endif else photstring1 = '   x        y      r  insky outsky      sky          mag          err     fwhm'
         endelse
-        photstring2 = '------------------------------------------------------------------------------'
+        photstring2 = '------------------------------------------------------------------------------------'
         printf, state.photfile, ' '
         printf, state.photfile, photstring1
         printf, state.photfile, photstring2
@@ -646,10 +650,20 @@ pro phast_apphot_refresh
   if (state.photprint EQ 1) then begin
     openw, state.photfile, state.photfilename, /append
     if (state.photerrors EQ 0) then fluxerr = 0.0
-    formatstring = '(2(f7.1," "),3(f5.1," "),3(g12.6," "),f5.2)'
-    printf, state.photfile, x, y, state.aprad, $
-      state.innersky, state.outersky, sky, flux, fluxerr, FWHM, $
-      format = formatstring
+    while (1 eq 1) do begin ;to check for no WCS
+       if state.phot_coord eq 1 then begin
+          formatstring = '(2(f10.6," "),3(f5.1," "),3(g12.6," "),f5.2)'
+          if ptr_valid(state.astr_ptr) then xy2ad,x,y,*state.astr_ptr,a,d else begin
+             temp = dialog_message('Cannot write RA/Dec to file with WCS solution!',/center,/error)
+             break
+          endelse
+          printf, state.photfile, a, d, state.aprad, state.innersky, state.outersky, sky, flux, fluxerr, FWHM, format = formatstring              
+       endif else begin
+          formatstring = '(2(f7.1," "),3(f5.1," "),3(g12.6," "),f5.2)'
+          printf, state.photfile, x, y, state.aprad, state.innersky, state.outersky, sky, flux, fluxerr, FWHM, format = formatstring
+       endelse
+       break
+    endwhile
     close, state.photfile
   endif
   

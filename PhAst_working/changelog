@@ -6,7 +6,8 @@ New features:
 -NEO object ephemeris can now be retrieved and plotted [Morgan Rehnberg]
 -Zero-point calculation now integrated into batch processing [Morgan Rehnberg]
 -Zero-point calculation now used only high S/N stars in large fields [Morgan Rehnberg]
+-Can now output RA/Dec in photometry file [Morgan Rehnberg]
 Bugs fixed:
 -Fixed crash when training photometric aperature on object with infinite FWHM [Morgan Rehnberg]
 -Improved compatability when setting default FITS keywords during calibration [Morgan Rehnberg]
-
+-Fixed a number of photometry-related bugs [Morgan Rehnberg]
