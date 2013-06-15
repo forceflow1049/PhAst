@@ -1284,16 +1284,21 @@ pro phast_detect_moving_objects
   x_data_array = ptrarr(state.num_images,/allocate)
   y_data_array = ptrarr(state.num_images,/allocate)
   size_data_array = ptrarr(state.num_images,/allocate)
+  bright_data_array = ptrarr(state.num_images,/allocate)
 
 ;run SExtractor on each image
   for moving_index=0, state.num_images-1 do begin
-     phast_do_sextractor, image=image_archive[moving_index]->get_name(), flags=' -CATALOG_TYPE ASCII_HEAD -PARAMETERS_NAME moving.param -DETECT_THRESH 2.0',cat_name=state.phast_dir+'/output/catalogs/moving'+strtrim(string(moving_index),2)+'.cat'
-     readcol, state.phast_dir+'/output/catalogs/moving'+strtrim(string(moving_index),2)+'.cat', *(x_data_array[moving_index]),*(y_data_array[moving_index]),*(size_data_array[moving_index]),skipline=3  
+     phast_do_sextractor, image=image_archive[moving_index]->get_name(), flags=' -CATALOG_TYPE ASCII_HEAD -PARAMETERS_NAME moving.param -DETECT_THRESH 1.5',cat_name=state.phast_dir+'/output/catalogs/moving'+strtrim(string(moving_index),2)+'.cat'
+     readcol, state.phast_dir+'/output/catalogs/moving'+strtrim(string(moving_index),2)+'.cat', *(x_data_array[moving_index]),*(y_data_array[moving_index]),*(size_data_array[moving_index]),*(bright_data_array[moving_index]),skipline=4  
   endfor
   
-;find objects that appear in multiple images
-  thresh =  0.000333d ;must be within x deg
-  size_thresh =  0.000195d;semi-major axis must be larger than x deg
+  ;; x_points = *(x_data_array[2])
+  ;; y_points = *(y_data_array[2])
+  ;; goto,mod_plot
+
+;find objects that appear in multiple images or are too small
+  thresh =  (1.389e-4)  ;must be within x deg
+  size_thresh =  (0.000195d)/1.5;semi-major axis must be larger than x deg
   same_array = ptrarr(state.num_images,/allocate)
   for moving_index=0, state.num_images-2 do begin ;compare successive pairs of images
      *(same_array[moving_index]) = list()
@@ -1304,62 +1309,33 @@ pro phast_detect_moving_objects
   endfor
   *(same_array[-1]) = list()
   for points_index=0, n_elements(*(x_data_array[-1]))-1 do begin
-     if  n_elements(where(abs((*(x_data_array[-1]))[points_index]-*(x_data_array[-2])) lt thresh and abs((*(y_data_array[-1]))[points_index]-*(y_data_array[-2])) lt thresh or ((*(size_data_array[-1]))[points_index] lt size_thresh),/null)) ne 0 then *(same_array[-1]).add, points_index
+     if n_elements(where(abs((*(x_data_array[-1]))[points_index]-*(x_data_array[-2])) lt thresh and abs((*(y_data_array[-1]))[points_index]-*(y_data_array[-2])) lt thresh or ((*(size_data_array[-1]))[points_index] lt size_thresh),/null)) ne 0 then *(same_array[-1]).add, points_index
   endfor
 
 ;remove these objects
   for moving_index=0, state.num_images-1 do begin
      if n_elements(*(x_data_array[moving_index])) ne n_elements((*(same_array[moving_index]))->toarray()) then begin
-        remove,(*(same_array[moving_index]))->toarray(),*(x_data_array[moving_index]),*(y_data_array[moving_index]), *(size_data_array[moving_index])
+        remove,(*(same_array[moving_index]))->toarray(),*(x_data_array[moving_index]),*(y_data_array[moving_index]), *(size_data_array[moving_index]), *(bright_data_array[moving_index])
      endif else begin
-        temp = dialog_message('No moving object detected!',/information,/center)
-        return
+        *(x_data_array[moving_index]) = [0]
+        *(y_data_array[moving_index]) = [0]
+        *(size_data_array[moving_index]) = [0]
+        *(bright_data_array[moving_index]) = [0]
+        ;; temp = dialog_message('No moving object detected!',/information,/center)
+        ;; return
      endelse
   endfor
-
-;eliminate points without a nearby point in the prevoius or next image
-  match_thresh = 0.01666 ;in deg
-  iso_points_array = ptrarr(state.num_images,/allocate) ;isolated points
-
-  ;handle first image
-  (*(iso_points_array[0])) = list()
-  for j=0, n_elements(*(x_data_array[0]))-1 do begin ;cycle points
-     nearby = where((abs((*(x_data_array[0]))[j] - *(x_data_array[1])) lt match_thresh and abs((*(y_data_array[0]))[j] - *(y_data_array[1])) lt match_thresh),/null)
-     if n_elements(nearby) eq 0 then (*(iso_points_array[0])).add, j
-  endfor  
-  for i=1, state.num_images-2 do begin ;cycle images
-     (*(iso_points_array[i])) = list()
-     for j=0, n_elements(*(x_data_array[i]))-1 do begin ;cycle points
-        nearby = where((abs((*(x_data_array[i]))[j] - *(x_data_array[i-1])) lt match_thresh and abs((*(y_data_array[i]))[j] - *(y_data_array[i-1])) lt match_thresh) or (abs((*(x_data_array[i]))[j] - *(x_data_array[i+1])) lt match_thresh and abs((*(y_data_array[i]))[j] - *(y_data_array[i+1])) lt match_thresh),/null)
-        if n_elements(nearby) eq 0 then (*(iso_points_array[i])).add, j
-     endfor
-  endfor
-  ;handle last image
-  (*(iso_points_array[-1])) = list()
-  for j=0, n_elements(*(x_data_array[-1]))-1 do begin ;cycle points
-     nearby = where((abs((*(x_data_array[-1]))[j] - *(x_data_array[-2])) lt match_thresh and abs((*(y_data_array[-1]))[j] - *(y_data_array[-2])) lt match_thresh),/null)
-     if n_elements(nearby) eq 0 then (*(iso_points_array[-1])).add, j
-  endfor  
-
-  ;remove these points
-  for moving_index=0, state.num_images-1 do begin
-     if n_elements((*(iso_points_array[moving_index]))->toarray()) ne n_elements(*(x_data_array[moving_index])) then begin
-        remove,(*(iso_points_array[moving_index]))->toarray(),*(x_data_array[moving_index]),*(y_data_array[moving_index]), *(size_data_array[moving_index])
-     endif else begin
-        temp = dialog_message('No moving object detected!',/information,/center)
-        return
-     endelse
-  endfor
+  ;; x_points = *(x_data_array[0])
+  ;; y_points = *(y_data_array[0])
+  ;; goto,mod_plot
 
   ;compute lines through remaining points
   progress_bar = obj_new('cgprogressbar',title='Searching...',/cancel)
   progress_bar->start
   move_thresh = 1.9e-4 ;must move at least this far on average (deg)
+  move_max = 0.05 ;cannot move more than this (deg) from image 1 to 3
   min_chi = 9999
-  image1_point = -9999
-  image2_point = -9999
-  image3_point = -9999
-  image4_point = -9999
+  image_points = [-9999,-9999,-9999]
   num_1 = n_elements(*(x_data_array[0]))-1
   num_2 =  n_elements(*(x_data_array[1]))-1
   num_3 = n_elements(*(x_data_array[2]))-1
@@ -1368,37 +1344,47 @@ pro phast_detect_moving_objects
      IF Progress_Bar->CheckCancel() THEN return
      for J=0, num_2 do begin ;second image points
         for k=0, num_3 do begin ;third image points
-           if state.num_images ge 4 then begin
-              for l=0, num_4 do begin ;fourth image points
-                 if stdev([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k],(*(x_data_array[3]))[l]]) gt move_thresh then if stdev([(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k],(*(y_data_array[3]))[l]]) gt move_thresh then begin
-                    temp = linfit([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k],(*(x_data_array[3]))[l]],[(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k],(*(y_data_array[3]))[l]],chisq=chisq)
-                    if chisq lt min_chi then begin
-                       min_chi = chisq
-                       image1_point = i
-                       image2_point = j
-                       image3_point = k
-                       image4_point = l
+           if stdev([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k]]) gt move_thresh then if stdev([(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k]]) gt move_thresh then begin
+                 ;; temp = linfit([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k]],[(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k]],chisq=chisq)
+                 x1 = (*(x_data_array[0]))[i]
+                 x2 = (*(x_data_array[1]))[j]
+                 x3 = (*(x_data_array[2]))[k]
+                 y1 = (*(y_data_array[0]))[i]
+                 y2 = (*(y_data_array[1]))[j]
+                 y3 = (*(y_data_array[2]))[k]
+                 chisq = abs((x1-x3)*(y2-y1)-(x1-x2)*(y3-y1))
+                 if chisq lt min_chi then begin
+                    ;check is point 2 is between 1 and 3
+                    x1 = (*(x_data_array[0]))[i]
+                    x2 = (*(x_data_array[1]))[j]
+                    x3 = (*(x_data_array[2]))[k]
+                    y1 = (*(y_data_array[0]))[i]
+                    y2 = (*(y_data_array[1]))[j]
+                    y3 = (*(y_data_array[2]))[k]
+                    mdpt_x = (x1+x3)/2.
+                    mdpt_y = (y1+y3)/2.
+                    p1p3 = sqrt((x1-x3)^2 + (y1-y3)^2)
+                    x_center_thresh = .05*abs(x1-x3) ;middle point must be within 10%  of estimated center
+                    y_center_thresh = .05*abs(y1-y3)
+                    if abs(x2-mdpt_x) lt x_center_thresh and abs(y2-mdpt_y) lt y_center_thresh and p1p3 lt move_max then begin
+                       print, 'pass center'
+                                ;check for similar brighness
+                       b1 =  (*(bright_data_array[0]))[i]
+                       b2 =  (*(bright_data_array[1]))[j]
+                       b3 =  (*(bright_data_array[2]))[k]
+                       vec = [b1,b2,b3]
+                       bright_mean = mean(vec)
+                       if n_elements(where(abs(vec-bright_mean)/bright_mean gt 0.15, /null)) eq 0 then begin
+                          print, 'pass bright'
+                          min_chi = chisq
+                          image_points[0] = i
+                          image_points[1] = j
+                          image_points[2] = k
+                       endif
                     endif
                  endif
-              endfor
-           endif else begin
-              if stdev([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k]]) gt move_thresh then if stdev([(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k]]) gt move_thresh then begin
-                 temp = linfit([(*(x_data_array[0]))[i],(*(x_data_array[1]))[j],(*(x_data_array[2]))[k]],[(*(y_data_array[0]))[i],(*(y_data_array[1]))[j],(*(y_data_array[2]))[k]],chisq=chisq)
-                 ;; x1 = (*(x_data_array[0]))[i]
-                 ;; x2 = (*(x_data_array[1]))[j]
-                 ;; x3 = (*(x_data_array[2]))[k]
-                 ;; y1 = (*(y_data_array[0]))[i]
-                 ;; y2 = (*(y_data_array[1]))[j]
-                 ;; y3 = (*(y_data_array[2]))[k]
-                 ;; chisq = abs((x1-x3)*(y2-y1)-(x1-x2)*(y3-y1))
-                 if chisq lt min_chi then begin
-                    min_chi = chisq
-                    image1_point = i
-                    image2_point = j
-                    image3_point = k
-                 endif
               endif
-           endelse
+          ; endelse
         endfor
      endfor
      progress_bar->update,float(i)/num_1*50
@@ -1406,10 +1392,7 @@ pro phast_detect_moving_objects
 
   ;repeat from other end of sequence
   min_chi = 9999
-  imageneg1_point = -9999
-  imageneg2_point = -9999
-  imageneg3_point = -9999
-  imageneg4_point = -9999
+  imageneg_points = [-9999,-9999,-9999]
   num_1 = n_elements(*(x_data_array[-1]))-1
   num_2 =  n_elements(*(x_data_array[-2]))-1
   num_3 = n_elements(*(x_data_array[-3]))-1
@@ -1418,76 +1401,97 @@ pro phast_detect_moving_objects
      IF Progress_Bar->CheckCancel() THEN return
      for J=0, num_2 do begin ;second image points
         for k=0, num_3 do begin ;third image points
-           if state.num_images ge 4 then begin
-              for l=0, num_4 do begin ;fourth image points
-                 if stdev([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k],(*(x_data_array[-4]))[l]]) gt move_thresh then if stdev([(*(y_data_array[-1]))[i],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k],(*(y_data_array[-4]))[l]]) gt move_thresh then begin
-                    temp = linfit([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k],(*(x_data_array[-4]))[l]],[(*(y_data_array[-1]))[i],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k],(*(y_data_array[-4]))[l]],chisq=chisq)
-                    if chisq lt min_chi then begin
-                       min_chi = chisq
-                       imageneg1_point = i
-                       imageneg2_point = j
-                       imageneg3_point = k
-                       imageneg4_point = l
+           if stdev([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k]]) gt move_thresh then if stdev([(*(y_data_array[0]))[-1],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k]]) gt move_thresh then begin
+                 ;; temp = linfit([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k]],[(*(y_data_array[0]))[-1],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k]],chisq=chisq)
+                 x1 = (*(x_data_array[-1]))[i]
+                 x2 = (*(x_data_array[-2]))[j]
+                 x3 = (*(x_data_array[-3]))[k]
+                 y1 = (*(y_data_array[-1]))[i]
+                 y2 = (*(y_data_array[-2]))[j]
+                 y3 = (*(y_data_array[-3]))[k]
+                 chisq = abs((x1-x3)*(y2-y1)-(x1-x2)*(y3-y1))
+                 if chisq lt min_chi then begin
+                    x1 = (*(x_data_array[-1]))[i]
+                    x2 = (*(x_data_array[-2]))[j]
+                    x3 = (*(x_data_array[-3]))[k]
+                    y1 = (*(y_data_array[-1]))[i]
+                    y2 = (*(y_data_array[-2]))[j]
+                    y3 = (*(y_data_array[-3]))[k]
+                    mdpt_x = (x1+x3)/2.
+                    mdpt_y = (y1+y3)/2.
+                    p1p3 = sqrt((x1-x3)^2 + (y1-y3)^2)
+                    x_center_thresh =  .05*abs(x1-x3) ;middle point must be within 10%  of estimated center
+                    y_center_thresh = 0.05*abs(y1-y3)
+                    if abs(x2-mdpt_x) lt x_center_thresh and abs(y2-mdpt_y) lt y_center_thresh and p1p3 lt move_max then begin
+                       print, 'pass reverse center'
+                       ;check for similar brighness
+                       b1 =  (*(bright_data_array[-1]))[i]
+                       b2 =  (*(bright_data_array[-2]))[j]
+                       b3 =  (*(bright_data_array[-3]))[k]
+                       vec = [b1,b2,b3]
+                       bright_mean = mean(vec)
+                       if n_elements(where(abs(vec-bright_mean)/bright_mean gt 0.15, /null)) eq 0 then begin
+                          print, 'pass reverse bright'
+                          min_chi = chisq
+                          imageneg_points[0] = i
+                          imageneg_points[1] = j
+                          imageneg_points[2] = k
+                       endif
                     endif
                  endif
-              endfor
-           endif else begin
-              if stdev([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k]]) gt move_thresh then if stdev([(*(y_data_array[0]))[-1],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k]]) gt move_thresh then begin
-                 temp = linfit([(*(x_data_array[-1]))[i],(*(x_data_array[-2]))[j],(*(x_data_array[-3]))[k]],[(*(y_data_array[0]))[-1],(*(y_data_array[-2]))[j],(*(y_data_array[-3]))[k]],chisq=chisq)
-                 ;; x1 = (*(x_data_array[-1]))[i]
-                 ;; x2 = (*(x_data_array[-2]))[j]
-                 ;; x3 = (*(x_data_array[-3]))[k]
-                 ;; y1 = (*(y_data_array[-1]))[i]
-                 ;; y2 = (*(y_data_array[-2]))[j]
-                 ;; y3 = (*(y_data_array[-3]))[k]
-                 ;; chisq = abs((x1-x3)*(y2-y1)-(x1-x2)*(y3-y1))
-                 if chisq lt min_chi then begin
-                    min_chi = chisq
-                    imageneg1_point = i
-                    imageneg2_point = j
-                    imageneg3_point = k
-                 endif
               endif
-           endelse
+          ; endelse
         endfor
      endfor
      progress_bar->update,50 + float(i)/num_1*50
   endfor
      progress_bar->destroy
   ;use only these points
-  if state.num_images eq 3 then begin
+
+ ; if state.num_images eq 3 then begin 
      x_points = fltarr(6)
      y_points = fltarr(6)
-  endif else begin
-     x_points = fltarr(8)
-     y_points = fltarr(8)
-  endelse
-  x_points[0] = (*(x_data_array[0]))[image1_point]
-  x_points[1] = (*(x_data_array[1]))[image2_point]
-  x_points[2] = (*(x_data_array[2]))[image3_point]
-  x_points[3] = (*(x_data_array[-1]))[imageneg1_point]
-  x_points[4] = (*(x_data_array[-2]))[imageneg2_point]
-  x_points[5] = (*(x_data_array[-3]))[imageneg3_point]
-  y_points[0] = (*(y_data_array[0]))[image1_point]
-  y_points[1] = (*(y_data_array[1]))[image2_point]
-  y_points[2] = (*(y_data_array[2]))[image3_point]
-  y_points[3] = (*(y_data_array[-1]))[imageneg1_point]
-  y_points[4] = (*(y_data_array[-2]))[imageneg2_point]
-  y_points[5] = (*(y_data_array[-3]))[imageneg3_point]
-  if state.num_images gt 3 then begin
-     x_points[6] = (*(x_data_array[3]))[image4_point]
-     x_points[7] = (*(x_data_array[-4]))[imageneg4_point]
-     y_points[6] = (*(y_data_array[3]))[image4_point]
-     y_points[7] = (*(y_data_array[-4]))[imageneg4_point]
-  endif
+  ;; endif else begin
+  ;;    x_points = fltarr(8)
+  ;;    y_points = fltarr(8)
+  ;; endelse
+     count = 0 ;how many fails?
+     for i=0, 2 do begin
+        if image_points[i] ge 0 then begin
+           x_points[i] = (*(x_data_array[i]))[image_points[i]] 
+           y_points[i] = (*(y_data_array[i]))[image_points[i]] 
+        endif else begin
+           count++
+           x_points[i] = 0
+           y_points[i] = 0
+        endelse
+     endfor
+     for i=0, 2 do begin
+        if imageneg_points[i] ge 0 then begin
+           x_points[i+3] = (*(x_data_array[-1-i]))[imageneg_points[i]] 
+           y_points[i+3] = (*(y_data_array[-1-i]))[imageneg_points[i]] 
+        endif else begin
+           count++
+           x_points[i+3] = 0
+           y_points[i+3] = 0
+        endelse
+     endfor
+     print, 'Failed detections: ', count
+     ;check that an object passed the test
+     if count gt 3  then begin
+        temp = dialog_message('No moving object detected!',/information,/center)
+        return
+     endif
 
   ;plot detections
-  colors= ['blue','green','red','yellow', 'cyan']
-  colorcode = colors[1]
+     mod_plot:
+
+  colors= ['blue','green','blue','yellow', 'cyan','yellow']
   circlesize = 7   &  circletext = strtrim(string(circlesize))
   fontsize = 1.75  &    fonttext = strtrim(string(fontsize))
   for i = 0, n_elements(x_points)-1 do begin
      if nplot lt maxplot then begin
+        colorcode = colors[0]
         nplot++
         ad2xy, x_points[i],y_points[i],*state.astr_ptr,x,y
         region_str = 'circle('+strtrim(string(x,2))+', '+strtrim(string(y,2))+', ' $
@@ -1927,5 +1931,7 @@ end
 pro phast_pipeline
 
 ;for compilation purposes only
+
+compile_opt IDL2, hidden
 
 end

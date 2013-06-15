@@ -42,7 +42,7 @@ pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul, astr=astr, head
   if not keyword_set(pixelscale) then pixelscale = state.pixelscale
   if not keyword_set(image_width) then image_width = state.image_size[0]
   if not keyword_set(image_height) then image_height = state.image_size[1]
-  if not keyword_set(astr) then astr = *state.astr_ptr
+  if not keyword_set(astr) and ptr_valid(state.astr_ptr) then astr = *state.astr_ptr
   if not keyword_set(head) then head = *state.head_ptr
   
   if n_elements(astr) ne 0 then begin

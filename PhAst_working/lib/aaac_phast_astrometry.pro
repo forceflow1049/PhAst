@@ -684,4 +684,6 @@ pro aaac_phast_astrometry
 
 ;for compilation purposes only
 
+compile_opt IDL2, hidden
+
 end

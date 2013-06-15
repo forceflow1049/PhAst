@@ -742,6 +742,4 @@ pro aaaa_phast_spectra
 
 ;for compilation purposes only
 
-compile_opt IDL2, hidden
-
 end

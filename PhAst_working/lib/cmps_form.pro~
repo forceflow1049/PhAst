@@ -1409,8 +1409,6 @@ Function cmps_form, xoffset, yoffset, Cancel=cancelButton, Help=help, $
 
    ; If the Help keyword is set, print some help information and return
 
-  compile_opt  hidden
-
   IF Keyword_Set(help) THEN BEGIN
       Doc_Library, 'cmps_form'
       RETURN, 0

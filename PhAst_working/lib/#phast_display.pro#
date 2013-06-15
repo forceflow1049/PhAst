@@ -2252,7 +2252,7 @@ pro phast_plot1ellipse, rmax, rmin, xc, yc, pos_ang, _extra = _extra
   ; that it won't ask for interactive input under any circumstances.
 
   if N_params() LT 5 then pos_ang = 0. ;Default position angle
-   
+  
   npoints = 500                   ;Number of points to connect
   phi = 2*!pi*(findgen(npoints)/(npoints-1)) ;Divide circle into Npoints
   ang = pos_ang/!RADEG            ;Position angle in radians
@@ -4453,7 +4453,5 @@ end
 pro phast_display
 
 ;for compilation purposes only
-
-compile_opt IDL2, hidden
 
 end

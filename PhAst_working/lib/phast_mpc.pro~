@@ -51,26 +51,58 @@ end
 
 ;----------------------------------------------------------------------
 
-function phast_get_mpc_ephem,name,year=year,month=month,day=day,hour=hour,min=min
+function phast_get_mpc_ephem,name,date
 
 ;routine to retrieve an asteroid ephemeris from NEODyS and return the
-;RA/Dec of the object. Only works for asteroids in the northern hemisphere.
+;RA/Dec of the object. Date should be in julian date
+
 
 common phast_state
 common phast_mpc_data
 
+widget_control, /hourglass
 
-a = webget('http://newton.dm.unipi.it/neodys/index.php?pc=1.1.3.1&n='+name+'&oc=500&y0=2013&m0=5&d0=16&h0=20&mi0=9&y1=2013&m1=5&d1=17&h1=21&mi1=9&ti=1.0&tiu=hours')
+if mpc.site_code eq '000' then print, 'Warning: Using observatory code 000 (Greenwich).  Are you sure this is the correct location?'
 
-openw, 1,'ephem.txt'
-for i=154, n_elements(a.text)-30 do begin
-   if strpos(a.text[i],'+ ') ne -1 then begin
-      split = strsplit(a.text[i],'+',/extract)
-      a.text[i] = split[0]+'+'+strtrim(split[1],1)
-   endif
-   printf, 1,a.text[i]
-endfor
-close,1
+;convert date
+hour = 1./24 ;1 hour in JD
+start = date - hour
+finish = date + hour
+
+start_str = date_conv(start, 'FITS') ; YYYY-MM-DDTHH:MM:SS.SS
+finish_str = date_conv(finish,'FITS'); YYYY-MM-DDTHH:MM:SS.SS
+start_split = strsplit(start_str,'-:T',/extract)
+finish_split = strsplit(finish_str,'-:T',/extract)
+
+tries = 0 ; allow user to self-enter name once
+while 1 eq 1 do begin
+   tries++
+   query = 'http://newton.dm.unipi.it/neodys/index.php?pc=1.1.3.1&n='+strcompress(name,/remove_all)+'&oc='+mpc.site_code+'&y0='+start_split[0]+'&m0='+start_split[1]+'&d0='+start_split[2]+'&h0='+start_split[3]+'&mi0='+start_split[4]+'&y1='+finish_split[0]+'&m1='+finish_split[1]+'&d1='+finish_split[2]+'&h1='+finish_split[3]+'&mi1='+finish_split[4]+'&ti=1.0&tiu=minutes'
+   
+   a = webget(query)
+   
+   count = 0
+   openw, 1,'ephem.txt'
+   for i=154, n_elements(a.text)-30 do begin
+      count++
+      ;check for case of + n or - n and make it +n or -n for DEC
+      if strpos(a.text[i],'+ ') ne -1 then begin
+         split = strsplit(a.text[i],'+',/extract)
+         a.text[i] = split[0]+'+'+strtrim(split[1],1)
+      endif else if strpos(a.text[i],'- ') ne -1 then a.text[i] = strmid(a.text[i],0,strpos(a.text[i],'- '))+' -'+strmid(a.text[i],strpos(a.text[i],'- ')+2)
+      printf, 1,a.text[i]
+   endfor
+   close,1
+
+   if count eq 0 then begin
+      if tries lt 2 then begin
+         name = dialog_input(prompt='Object ' + name + ' not found.  Please enter the correct name:',title='Error')
+      endif else begin
+         err = dialog_message('This object is not recognized by NEODys',/error,/center)
+         return, list()
+      endelse
+   endif else break
+endwhile
 
 readcol, 'ephem.txt',day,monrh,year,hour,ra_h,ra_m,ra_s,dec_d,dec_m,dec_s,mag,alt,airmass, sun_elv, sol_elv, lun_elv,phast,glat,glon,r,delta,v_ra,v_dec,err_long,err_short,err_pa,Format='I,A,L,F,I,I,F,A,I,F,F,F,A,A,F,F,F,F,F,F,F,F,F,A,A,F'
 
@@ -79,14 +111,18 @@ file_delete,'ephem.txt' ;clean up
 ;convert to degrees
 ra_deg = fltarr(n_elements(ra_h))
 dec_deg = fltarr(n_elements(ra_h))
+err_long_deg = fltarr(n_elements(ra_h))
+err_short_deg = fltarr(n_elements(ra_h))
 
 for i=0, n_elements(ra_deg)-1 do begin
-   re_deg = ten(ra_h[i],ra_m[i],ra_s[i])*15
-   dec_deg = ten(dec_d[i],dec_m[i],dec_s[i])
-
+   ra_deg[i] = ten(ra_h[i],ra_m[i],ra_s[i])*15
+   dec_deg[i] = ten(dec_d[i],dec_m[i],dec_s[i])
+   if strpos(err_long[i],"'") ne -1 then err_long_deg[i] = float(err_long[i])/60
+   if strpos(err_long[i],'"') ne -1 then err_long_deg[i] = float(err_long[i])/60/60
+   if strpos(err_short[i],"'") ne -1 then err_short_deg[i] = float(err_short[i])/60
+   if strpos(err_short[i],'"') ne -1 then err_short_deg[i] = float(err_short[i])/60/60
 endfor
-
-return, [ra_deg,dec_deg] ;[ra,dec] in degrees
+return, list(ra_deg,dec_deg,err_long_deg,err_short_deg,err_pa) ;[ra,dec,err_long,err_short,err_pa] in degrees
 end
 
 ;----------------------------------------------------------------------

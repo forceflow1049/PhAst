@@ -4454,4 +4454,6 @@ pro phast_display
 
 ;for compilation purposes only
 
+compile_opt IDL2, hidden
+
 end

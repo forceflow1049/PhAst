@@ -660,4 +660,6 @@ pro phast_other
 
 ;for compilation purposes only
 
+compile_opt IDL2, hidden
+
 end

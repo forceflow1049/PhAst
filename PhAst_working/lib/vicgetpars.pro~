@@ -79,8 +79,6 @@ end
 ;===========================================================================
 function vicgetpars, label, keyword, status=status, pos=pos, string=string
 
-  compile_opt IDL2, hidden
-
  status=0
 
 

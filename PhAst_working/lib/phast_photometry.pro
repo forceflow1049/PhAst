@@ -1831,4 +1831,6 @@ pro phast_photometry
 
 ;for compilation purposes only
 
+compile_opt IDL2, hidden
+
 end

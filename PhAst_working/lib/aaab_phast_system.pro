@@ -259,8 +259,10 @@ pro phast_add_image, new_image, filename, head, refresh_index = refresh, refresh
   widget_control,state.image_select_id,set_value=short_names
 
   ;add a new tab for the image.
-  state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
-  widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
+  if not keyword_set(refresh_toggle) then begin
+     state.tab_list.add, widget_base(state.tab_bar_id,title=short_names[-1],uvalue='image_tab')
+     widget_control,state.tab_bar_id,set_tab_current=state.current_image_index
+  endif
   ;remove the 'no images loaded' tab, if present
   if (state.num_images eq 1) and (n_elements(state.tab_list) gt 1) then widget_control,state.tab_list.remove(0),/destroy
 end
@@ -2508,7 +2510,6 @@ pro phast_read_config
     ;
     ; set photometric apertures based on typical object fwhm to be consistent with sextractor apertures
     if finite(state.objfwhm) then begin
-       print, 'here'
         state.objfwhm = state.objfwhm / state.pixelScale
         phast_setAps, state.objfwhm, 0
     endif  
@@ -4236,5 +4237,7 @@ end
 pro aaab_phast_system
 
 ;for compilation purposes only
+
+compile_opt IDL2, hidden
 
 end

@@ -1,6 +1,6 @@
 ;-------------------------------------------------------------------
 
-pro phastslicer_event, event
+pro phastslicerevent, event
 
   ; event handler for data cube slice selector widgets
 
@@ -1178,6 +1178,7 @@ pro phast_event, event
      end
      'create_mpc_report': phast_mpc_report
      'overlay_ephem': begin
+        if state.num_images eq 0 then return
         if image_archive[state.current_image_index]->astr_valid() then begin
            ;get the name of the current object
            name = image_archive[state.current_image_index]->get_obj_name()
@@ -1237,6 +1238,7 @@ pro phast_event, event
            phast_plot1region, nplot
         endif else tmp = dialog_message('You must have an astrometric solution to retrieve an ephemeris!',/error,/center)
      end
+     'find_moving_object': phast_detect_moving_objects
      ;align
      'align_toggle': begin
         if state.align_toggle eq 0 then begin
@@ -1828,7 +1830,7 @@ pro phast_image::set_image, image
   
   *(self.image) = image
   image_size= size(image)
-  *(self.size) = [image_size[2],image_size[3]]
+  *(self.size) = [image_size[1],image_size[2]]
   *(self.min_stretch) = min(image) > 0
   *(self.max_stretch) = max(image)
   
@@ -1838,7 +1840,7 @@ end
 
 pro phast_image::set_max_stretch, c
   
-;routine to set the contrast stretch for the image
+;routine to set the max stretch for the image
   
   *(self.max_stretch) = c
 end
@@ -2326,6 +2328,12 @@ pro phast_readfits, fitsfilename=fitsfilename, newimage=newimage, dir=dir,refres
         newimage = 0
         return
      endif
+
+     if keyword_set(dir) then begin
+        phast_getstats, align=state.default_align
+        phast_autoscale
+        phast_set_minmax
+     endif
      
     ; check for 2d image or 3d cube, and store the header if all is well:
      s = (size(main_image))[0]
@@ -2381,6 +2389,7 @@ pro phast_read_config
     for i=0, n_elements(var)-1 do begin
       case strlowcase(strtrim(var[i])) of
                                 ;calibration
+         'force_j2000': state.force_j2000 = fix(val[i])
          'bias_file': begin
             state.bias_filename = val[i]
             fits_read,state.bias_filename,cal_bias,cal_flat_head
@@ -2428,6 +2437,7 @@ pro phast_read_config
          'tb_mpc_visible': state.tb_mpc_visible = fix(val[i])
                                 ;calibration
          'cal_file_name': state.cal_file_name = val[i]
+         'fast_zeropoint': state.fast_zeropoint = fix(val[i])
                                 ;photometery
          'photfilename': state.photfilename = val[i]
          'aprad': state.aprad = float(val[i])
@@ -2447,6 +2457,7 @@ pro phast_read_config
             state.fits_cdelt1 = -(state.pixelscale/3600.0)*sin(float(val[i])*!pi/180.0)
             state.fits_cdelt2 = -state.fits_cdelt1
          end
+         'phot_coord': state.phot_coord = fix(val[i])
                                 ;MPC reporting
          'mpc_net': mpc.net = val[i]
          'mpc_com': mpc.com = val[i]
@@ -2476,7 +2487,7 @@ pro phast_read_config
          else: print, 'Parameter '+var[i]+' not found in phast_state!'
       endcase
    endfor
-                                ;
+ endif                          ;
     ;now, process any state defaults based on inputs
     if state.pixelscale le 0 then begin
        print, 'Warning: CCD pixel scale has not been set.  Defaulting to 1.0" per pixel.'
@@ -2499,10 +2510,7 @@ pro phast_read_config
     if finite(state.objfwhm) then begin
         state.objfwhm = state.objfwhm / state.pixelScale
         phast_setAps, state.objfwhm, 0
-    endif
-    
-  endif
-  
+    endif  
 end
 
 ;-----------------------------------------------------------------------------------------
@@ -2793,7 +2801,7 @@ pro phast_remove_image,index=index,all=all
         phast_settitle, /reset
         phast_base_image
      endelse
-  endif else begin
+  endif else begin ;keyword \all set
      state.tab_list.add,widget_base(state.tab_bar_id,title='No images loaded')
      for i=0,state.num_images-1 do begin
         obj_destroy,image_archive[i]
@@ -3273,7 +3281,8 @@ pro phast_startup, phast_dir, launch_dir, small
                   {cw_pdmenu_s, 2, 'Photometric zero-point'},$
                   {cw_pdmenu_s, 1, 'Help'}, $ ; help menu
                   {cw_pdmenu_s, 0, 'PHAST Help'},$
-                  {cw_pdmenu_s, 0, 'Debug info'},$                  
+                  {cw_pdmenu_s, 0, 'Debug info'},$
+                  {cw_pdmenu_s, 0, 'Stop execution'},$
                   {cw_pdmenu_s, 2, 'Check for updates'}$
                   ]
           
@@ -3495,6 +3504,7 @@ pro phast_startup, phast_dir, launch_dir, small
      mpc_button_box_1 = widget_base(state.mpc_box_id,/row)
      create_mpc_report = widget_button(mpc_button_box_1,value='Start MPC report',uvalue='create_mpc_report')
      overlay_ephem = widget_button(mpc_button_box_1,value='Overlay Ephemeris',uvalue='overlay_ephem')
+     mod_button = widget_button(state.mpc_box_id,value='Find moving objects',uvalue='find_moving_object')
   endif
   
   ;; state.draw_window_size[1] = state.draw_window_size[1] < $
@@ -3704,11 +3714,13 @@ pro phast_topmenu_event, event
      ;' FIRST': phast_getfirst
      'LoadRegions': phast_loadregion
      'SaveRegions': phast_saveregion
-     'Remove current image': phast_remove_image,index=state.current_image_index
+     'Remove current image': if state.num_images gt 0 then phast_remove_image,index=state.current_image_index
      'Remove all images': begin
-        widget_control,/hourglass
-        state.current_image_index = 0
-        phast_remove_image,/all
+        if state.num_images gt 0 then begin
+           widget_control,/hourglass
+           state.current_image_index = 0
+           phast_remove_image,/all
+        endif
      end
      'Clear output directory': begin
         result = dialog_message('Empty output/images/ ?  This will remove all files from this directory',/question,/center)
@@ -3869,6 +3881,7 @@ pro phast_topmenu_event, event
      ; Help options:
      'PHAST Help': phast_help
      'Debug info': phast_debug_info
+     'Stop execution': stop
      'Check for updates': phast_check_updates
      
      else: print, 'Unknown event in file menu!'
@@ -4222,5 +4235,7 @@ end
 pro aaab_phast_system
 
 ;for compilation purposes only
+
+compile_opt IDL2, hidden
 
 end

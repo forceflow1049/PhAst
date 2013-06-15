@@ -225,7 +225,6 @@ phast_pipeline: procedures for image processing
      phast_combine
      phast_combine_gui
      phast_combine_gui_event
-     phast_detect_moving_object
      phast_do_all
      phast_do_batch
      phast_do_missfits

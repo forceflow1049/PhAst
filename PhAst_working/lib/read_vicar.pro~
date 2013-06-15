@@ -107,8 +107,6 @@ function read_vicar, filename, label, status=status, $
    silent=silent, default_format=default_format, swap=swap, $
    n_l=n_l, n_s=n_s, n_b=n_b, nlb=nlb, nbb=nbb, show=show, flip=flip
 
-  compile_opt hidden
-
  if(n_elements(n_l) NE 0) then nl=n_l
  if(n_elements(n_s) NE 0) then ns=n_s
  if(n_elements(n_b) NE 0) then nb=n_b

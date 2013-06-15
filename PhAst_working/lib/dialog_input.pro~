@@ -87,7 +87,6 @@ FUNCTION DIALOG_INPUT, PROMPT = prompt, TITLE = title, INITIAL = initial, $
     NFIELDS = nfields, DIALOG_PARENT = dialog_parent, $
     OK = ok, CANCEL = cancel
 
-compile_opt IDL2, hidden
 
 numFields = 1
 IF (N_ELEMENTS (nfields) NE 0) THEN $
