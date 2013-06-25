@@ -2224,7 +2224,7 @@ pro phast_read_config
  endif
     ;
     ;now, process any state defaults based on inputs
-  if state.pixelscale le 0 then begin
+    if state.pixelscale le 0 then begin
        print, 'Warning: CCD pixel scale has not been set.  Defaulting to 1.0" per pixel.'
        state.pixelscale = 1.0
        state.magunits = 0
