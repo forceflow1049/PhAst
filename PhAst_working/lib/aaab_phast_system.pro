@@ -1202,8 +1202,13 @@ pro phast_event, event
            ad2xy, (result[0])[-1],(result[1])[-1],*state.astr_ptr,x1,y1
            ad2xy, (result[0])[size/2],(result[1])[size/2],*state.astr_ptr,xc,yc
            nplot++
-           line1_str = 'line' + '(' + strtrim(string(x0),1) + ', ' + strtrim(string(y0),1) + ', ' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1)+') # color=green'
-           options = {color: 'green', thick:1}
+           ;configure plot color to be most visible
+           if state.invert_colormap eq 1 then begin
+              color = 'blue'
+           endif else color = 'green'
+           
+           line1_str = 'line' + '(' + strtrim(string(x0),1) + ', ' + strtrim(string(y0),1) + ', ' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1)+') # color='+color
+           options = {color: color, thick:1}
            options.color = phast_icolor(options.color)
            pstruct = {type:'region', $      ;type of plot
                       reg_array:[line1_str], $ ;region array to plot
@@ -1213,7 +1218,7 @@ pro phast_event, event
            phast_plotwindow
            phast_plot1region, nplot
            nplot++
-           line2_str = 'line' + '(' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1) + ', ' + strtrim(string(x1),1) + ', ' + strtrim(string(y1),1)+') # color=green'
+           line2_str = 'line' + '(' + strtrim(string(xc),1) + ', ' + strtrim(string(yc),1) + ', ' + strtrim(string(x1),1) + ', ' + strtrim(string(y1),1)+') # color='+color
            pstruct = {type:'region', $      ;type of plot
                       reg_array:[line2_str], $ ;region array to plot
                       options: options $
@@ -1221,6 +1226,7 @@ pro phast_event, event
            plot_ptr[nplot] = ptr_new(pstruct)
            phast_plotwindow
            phast_plot1region, nplot
+
            ;plot the ellipse with 3-sigma errors
            ad2xy, (result[0])[size/2]+3*(result[2])[size/2],(result[1])[size/2]+3*(result[3])[size/2],*state.astr_ptr,right_x,top_y
            ad2xy, (result[0])[size/2]-3*(result[2])[size/2],(result[1])[size/2]-3*(result[3])[size/2],*state.astr_ptr,left_x,bot_y
@@ -1228,8 +1234,8 @@ pro phast_event, event
            y_width = abs(top_y-bot_y)
            nplot++
            ellipse_str = 'ellipse' + '(' + strtrim(string(xc),1) + ', ' + $
-                         strtrim(string(yc),1) + ', ' + strtrim(string(y_width),1) + ', ' + strtrim(string(x_width),1) + ', ' + strtrim(string((result[4])[size/2]),1)+ ') # color=green'
-           options = {color: 'green', thick:1}
+                         strtrim(string(yc),1) + ', ' + strtrim(string(y_width),1) + ', ' + strtrim(string(x_width),1) + ', ' + strtrim(string((result[4])[size/2]),1)+ ') # color='+color
+           options = {color: color, thick:1}
            options.color = phast_icolor(options.color)
            pstruct = {type:'region', $        ;type of plot
                       reg_array:[ellipse_str], $ ;region array to plot
@@ -2827,7 +2833,7 @@ pro phast_setheader, head
   ; Routine to keep the image header using a pointer to a
   ; heap variable.  If there is no header (i.e. if phast has just been
   ; passed a data array rather than a filename), then make the
-  ; header pointer a null pointer.  Get astrometry info from the
+  ; header poiner a null pointer.  Get astrometry info from the
   ; header if available.  If there's no astrometry information, set
   ; state.astr_ptr to be a null pointer.
 
@@ -2887,7 +2893,8 @@ pro phast_setheader, head
   ;   print, 'OSIRIS header keywords CRVAL2, CRVAL3 fixed.'
   endif
   
-  extast, head, astr, noparams
+  ;extast, head, astr, noparams
+  phast_extract_astrometry, head, astr, noparams
   
   ; No valid astrometry in header
   if (noparams EQ -1) then begin

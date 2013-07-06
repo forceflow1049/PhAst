@@ -33,6 +33,37 @@ end
 
 ;----------------------------------------------------------------------
 
+pro phast_extract_astrometry, head, astr, noparams
+
+; routine to extract astrometry from FITS header.  If no non-linear
+; coeficients are present, this just returns the result of extast
+
+  extast, head, astr, noparams
+  
+  if noparams eq -1 then return ;no astrometry info
+
+  pv1_0 = sxpar(head,'PV1_0')
+  pv2_0 = sxpar(head,'PV2_0')
+  ctype1 = sxpar(head, 'CTYPE1')
+
+  if (pv1_0 ne 0) or (pv2_0 ne 0) then begin ;non-linear coef present
+     if (ctype1 eq 'RA---TAN') or (ctype1 eq 'DEC--TAN') or (ctype1 eq 'RA---TPV') or (ctype1 eq 'DEC--TPV') then begin ;formula for TAN projection only
+        pv1_x = dblarr(11)
+        pv2_x = dblarr(11)
+        for i=0, 10 do begin
+           ;extract parameters
+           pv1_x[i] = sxpar(head,'PV1_'+strtrim(string(i),1))
+           pv2_x[i] = sxpar(head,'PV2_'+strtrim(string(i),1))
+        endfor     
+        ;create new structure that includes the nonlinear coef
+        new = {naxis:astr.naxis,cd:astr.cd,cdelt:astr.cdelt,crpix:astr.crpix,crval:astr.crval,ctype:astr.ctype,longpole:astr.longpole,latpole:astr.latpole,pv2:astr.pv2,nl_pv1:pv1_x,nl_pv2:pv2_x}
+        astr = new
+     endif     
+  endif
+end
+
+;----------------------------------------------------------------------
+
 pro phast_getFieldEpoch, a0, d0, radius, X, obsDate, JD=datejul, astr=astr, header=head,image_width=image_width,image_height=image_height,pixelscale=pixelscale
   ; get common specs for image
 
@@ -388,7 +419,7 @@ function phast_wcs2pix, coords, coord_sys=coord_sys, line=line
     disp_base60 = state.display_base60
     bastr = *(state.astr_ptr)
     
-    ; function to convert an PHAST region from wcs coordinates to pixel coordinates
+    ; function to convert a PHAST region from wcs coordinates to pixel coordinates
     degperpix = phast_degperpix(*(state.head_ptr))
     
     ; need numerical equinox values
@@ -677,6 +708,36 @@ function phast_wcsstring, lon, lat, ctype, equinox, disp_type, disp_equinox, $
   
   return, wcsstring
 END
+
+;---------------------------------------------------------------------
+
+pro phast_xy2ad, x,y,astr,a,d
+
+  ;wrapper for xy2ad which can handle SCAMP non-linear coords
+
+  if tag_exist(astr,'nl_PV1') then begin
+     
+     cd = astr.cd
+     crpix = astr.crpix
+     pv1 = astr.nl_pv1
+     pv2 = astr.nl_pv2
+
+     xi = cd[0,0] * (x - CRPIX[0]) + CD[0,1] * (y - CRPIX[1])
+     eta = cd[1,0] * (x - CRPIX[0]) + CD[1,1] * (y - CRPIX[1])
+
+     r = sqrt(xi^2+eta^2)
+
+     xi_prime = PV1[0] + PV1[1] * xi + PV1[2] * eta + PV1[3] * r + PV1[4] * xi^2 + PV1[5] * xi * eta + PV1[6] * eta^2 + PV1[7] * xi^3 + PV1[8] * xi^2 * eta + PV1[9] * xi * eta^2 + PV1[10] * eta^3
+
+     eta_prime = PV2[0] + PV2[1] * eta + PV2[2]* xi + PV2[3] * r + PV2[4] * eta^2 + PV2[5] * eta * xi + PV2[6] * xi^2 + PV2[7] * eta^3 + PV2[8] * eta^2 * xi + PV2[9] * eta * xi^2 + PV2[10] * xi^3
+        
+
+     WCSXY2SPH, xi_prime, eta_prime, a, d, CTYPE = astr.ctype[0:1], PV2 = astr.pv2, $
+                LONGPOLE = astr.longpole, CRVAL = astr. crval, LATPOLE = astr.latpole
+
+  endif else xy2ad,x,y,astr,a,d
+
+end
 
 ;---------------------------------------------------------------------
 

@@ -981,8 +981,6 @@ pro phast_getdisplay
   common phast_state
   common phast_images
   
-  ;widget_control, /hourglass
-  
   display_image = bytarr(state.draw_window_size[0], state.draw_window_size[1])
   
   view_min = round(state.centerpix - $
@@ -1079,12 +1077,14 @@ pro phast_gettrack
   ; Update coordinate display.
   
   if (state.wcstype EQ 'angle') then begin
-    xy2ad, state.coord[0], state.coord[1], *(state.astr_ptr), lon, lat
-    wcsstring = phast_wcsstring(lon, lat, (*state.astr_ptr).ctype,  $
-      state.equinox, state.display_coord_sys, $
-      state.display_equinox, state.display_base60)
+
+     phast_xy2ad, state.coord[0], state.coord[1], *(state.astr_ptr), lon, lat
+     xy2ad, state.coord[0], state.coord[1], *(state.astr_ptr), lon, lat
+     wcsstring = phast_wcsstring(lon, lat, (*state.astr_ptr).ctype,  $
+                                 state.equinox, state.display_coord_sys, $
+                                 state.display_equinox, state.display_base60)
       
-    widget_control, state.wcs_bar_id, set_value = wcsstring
+     widget_control, state.wcs_bar_id, set_value = wcsstring
     
   endif
   
@@ -2291,7 +2291,7 @@ end
 
 ;----------------------------------------------------------------------
 
-pro phast_plot1region, iplot
+pro phast_plot1region, iplot, fast=fast
 
   ; Plot a region overlay on the image
 
@@ -2301,7 +2301,7 @@ pro phast_plot1region, iplot
   phast_setwindow, state.draw_window_id
   
   widget_control, /hourglass
-  
+  tic
   reg_array = (*(plot_ptr[iplot])).reg_array
   n_reg = n_elements(reg_array)
   
@@ -2468,13 +2468,11 @@ pro phast_plot1region, iplot
     case strlowcase(reg_type) of
     
       'circle': begin
-        xcenter = (float(coords_arr[0]) - state.offset[0] + 0.5) * $
-          state.zoom_factor
-        ycenter = (float(coords_arr[1]) - state.offset[1] + 0.5) * $
-          state.zoom_factor
+        xcenter = (float(coords_arr[0]) - state.offset[0] + 0.5)*state.zoom_factor
+        ycenter = (float(coords_arr[1]) - state.offset[1] + 0.5)*state.zoom_factor
           
         radius = float(coords_arr[2]) * state.zoom_factor
-        
+           
         ; added by AJB: rescale for postscript output for each plot type
         if (!d.name EQ 'PS') then begin
           xcenter = xcenter / state.draw_window_size[0] * !d.x_size
@@ -2484,7 +2482,7 @@ pro phast_plot1region, iplot
         
         tvcircle, radius, xcenter, ycenter, $
           _extra = (*(plot_ptr[iplot])).options,/device
-          
+        
         if (text_str ne '') then xyouts, xcenter, ycenter, text_str, $
           alignment=0.5, _extra = (*(plot_ptr[iplot])).options, /device
       end
@@ -2666,9 +2664,10 @@ end
 
 ;---------------------------------------------------------------------
 
-pro phast_plotall
+pro phast_plotall, fast=fast
 
   ; Routine to overplot all line, text, and contour plots
+  ; if keyword /fast set, only visible plots will be plotted
 
   common phast_state
   common phast_pdata
@@ -2685,7 +2684,7 @@ pro phast_plotall
       'contour' : phast_plot1contour, iplot
       'compass' : phast_plot1compass, iplot
       'scalebar': phast_plot1scalebar, iplot
-      'region'  : phast_plot1region, iplot
+      'region'  : phast_plot1region, iplot,fast=fast
     else      : print, 'Problem in phast_plotall!'
   endcase
 endfor
@@ -2744,7 +2743,7 @@ pro phast_refresh, fast = fast
     phast_getoffset
     phast_getdisplay
     phast_displaymain
-    phast_plotall
+    phast_plotall, fast=1
   endif else begin
     phast_displaymain
   endelse

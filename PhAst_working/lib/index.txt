@@ -171,6 +171,7 @@ phast_display: handles display of images
 
 phast_astrometry: handles image astrometry
      phast_degperpix
+     phast_extract_astrometry
      phast_getFieldEpoch
      phast_getoffset
      phast_getradec
@@ -179,6 +180,7 @@ phast_astrometry: handles image astrometry
      phast_wavestring
      phast_wcs2pix
      phast_wcsstring
+     phast_xy2ad
      phast_astrometry
 
 phast_photometry: handles image photometry
