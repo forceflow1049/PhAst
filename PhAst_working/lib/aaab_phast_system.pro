@@ -1184,8 +1184,8 @@ pro phast_event, event
         if image_archive[state.current_image_index]->astr_valid() then begin
            ;get the name of the current object
            name = image_archive[state.current_image_index]->get_obj_name()
-           ;get the date of the observation
-           jd = image_archive[state.current_image_index]->get_obs_date()
+           ;get the date of the observation indexed from first image
+           jd = image_archive[0]->get_obs_date()
            ;query MPC for ephemeris
            result = phast_get_mpc_ephem(name,jd)
            if n_elements(result) eq 0 then return
@@ -1198,9 +1198,9 @@ pro phast_event, event
 
            ;convert to xy coords and plot
            size = n_elements(result[0])
-           ad2xy, (result[0])[0],(result[1])[0],*state.astr_ptr,x0,y0
-           ad2xy, (result[0])[-1],(result[1])[-1],*state.astr_ptr,x1,y1
-           ad2xy, (result[0])[size/2],(result[1])[size/2],*state.astr_ptr,xc,yc
+           ad2xy, (result[0])[0],(result[1])[0],image_archive[0]->get_astr(),x0,y0
+           ad2xy, (result[0])[-1],(result[1])[-1],image_archive[0]->get_astr(),x1,y1
+           ad2xy, (result[0])[size/2],(result[1])[size/2],image_archive[0]->get_astr(),xc,yc
            nplot++
            ;configure plot color to be most visible
            if state.invert_colormap eq 1 then begin
@@ -1228,8 +1228,8 @@ pro phast_event, event
            phast_plot1region, nplot
 
            ;plot the ellipse with 3-sigma errors
-           ad2xy, (result[0])[size/2]+3*(result[2])[size/2],(result[1])[size/2]+3*(result[3])[size/2],*state.astr_ptr,right_x,top_y
-           ad2xy, (result[0])[size/2]-3*(result[2])[size/2],(result[1])[size/2]-3*(result[3])[size/2],*state.astr_ptr,left_x,bot_y
+           ad2xy, (result[0])[size/2]+3*(result[2])[size/2],(result[1])[size/2]+3*(result[3])[size/2],image_archive[0]->get_astr(),right_x,top_y
+           ad2xy, (result[0])[size/2]-3*(result[2])[size/2],(result[1])[size/2]-3*(result[3])[size/2],image_archive[0]->get_astr(),left_x,bot_y
            x_width = abs(right_x-left_x)
            y_width = abs(top_y-bot_y)
            nplot++
