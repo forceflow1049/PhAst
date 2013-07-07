@@ -144,7 +144,7 @@ pro phast_mpc_generate_report
   printf,1,'OBS '+mpc.observers
   printf,1,'MEA '+mpc.measurer
   printf,1,'TEL '+mpc.telescope
-  printf,1,'ACK '+mpc.ack
+  printf,1,'ACK '+mpc.ack+' -- '+mpc.prov_desig
   printf,1,'AC2 '+mpc.contact_email
   printf,1,'NET '+mpc.net
   printf,1,'COM '+mpc.com
