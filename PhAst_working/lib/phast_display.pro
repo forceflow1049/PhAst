@@ -1079,7 +1079,7 @@ pro phast_gettrack
   if (state.wcstype EQ 'angle') then begin
 
      phast_xy2ad, state.coord[0], state.coord[1], *(state.astr_ptr), lon, lat
-     xy2ad, state.coord[0], state.coord[1], *(state.astr_ptr), lon, lat
+     ;xy2ad, state.coord[0], state.coord[1], *(state.astr_ptr), lon, lat
      wcsstring = phast_wcsstring(lon, lat, (*state.astr_ptr).ctype,  $
                                  state.equinox, state.display_coord_sys, $
                                  state.display_equinox, state.display_base60)

@@ -102,7 +102,8 @@ pro phast_initcommon, phast_dir, launch_dir, small
     cal_science_head, $
     cal_dark_head, $
     cal_flat_head, $
-    cal_bias_head
+    cal_bias_head, $
+    blink_buffer
     
   common phast_objects, mpeg_id
   
@@ -164,6 +165,8 @@ pro phast_initcommon, phast_dir, launch_dir, small
     }
     
   state = {                $
+    cache_location: 0, $   ;index of currently displayed image in cache
+    cache_blink_images: 0,$;cache images while blinking? 
     phot_coord: 0, $       ;output RA/DEC for photometry (1=yes)
     fast_zeropoint: 1, $   ;use fast mode for zeropoint computation?
     force_j2000: 0, $      ;force a J2000 equinox during calibration?
@@ -547,6 +550,7 @@ pro phast_initcommon, phast_dir, launch_dir, small
   cal_dark = 0
   cal_flat = 0
   cal_bias = 0
+  blink_buffer = 0
   
   mpc_date = strarr(5)
   mpc_ra = dblarr(5)

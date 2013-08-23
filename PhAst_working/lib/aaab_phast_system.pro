@@ -1106,7 +1106,7 @@ pro phast_event, event
            widget_control,state.blink_base_id,ysize=1
            state.tb_blink_toggle = 0
         endif else begin
-           widget_control,state.blink_base_id,ysize=130
+           widget_control,state.blink_base_id,ysize=170
            state.tb_blink_toggle =1
         endelse
      end
@@ -1114,17 +1114,68 @@ pro phast_event, event
      'blink_last': phast_image_switch,state.num_images-1
      'blink_forward': phast_cycle_images,1
      'blink_back': phast_cycle_images,-1
-     'blink_pause': state.pause_state = 1
+     'blink_pause': begin 
+        state.pause_state = 1
+        if state.cache_blink_images eq 1 then blink_buffer = 0 ;release memory
+     end
+     'cache_images': state.cache_blink_images = event.select
      'blink_animate': begin
-        phast_cycle_images,1,/animate
-        widget_control,state.blink_base_label_id,timer=state.animate_speed
-        state.pause_state = 0
+        if state.cache_blink_images eq 0 then begin
+           phast_cycle_images,1,/animate
+           widget_control,state.blink_base_label_id,timer=state.animate_speed
+           state.pause_state = 0
+        endif else begin
+           phast_setwindow, state.draw_window_id
+           size = size(display_image)
+           ;create a buffer to hold the cached images
+           blink_buffer = dblarr(size[1],size[2],state.num_images)
+           ;read all the images into the cache
+           for i=0, state.num_images-1 do begin
+              phast_image_switch,i
+              blink_buffer[*,*,i]  = display_image
+           endfor
+           widget_control,state.blink_base_label_id,timer=state.animate_speed
+           state.pause_state = 0
+        endelse
      end
      'blink_base_label': begin  ;NOTE: USED FOR ANIMATIONS ONLY
         if state.pause_state eq 0 then begin
-           phast_cycle_images,1,/animate
-           widget_control, state.blink_base_label_id, timer=state.animate_speed
-        end
+           if state.cache_blink_images eq 0 then begin
+              phast_cycle_images,1,/animate
+              widget_control, state.blink_base_label_id, timer=state.animate_speed
+           endif else begin
+              phast_setwindow, state.draw_window_id
+              tv, blink_buffer[*,*,state.cache_location]
+              case state.animate_type of
+                 'forward': begin
+                    if state.cache_location lt state.num_images-1 then begin
+                       state.cache_location++
+                    endif else state.cache_location = 0
+                 end
+                 'backward': begin
+                    if state.cache_location gt 0 then begin
+                       state.cache_location--
+                    endif else state.cache_location = state.num_images-1
+                 end
+                 'bounce': begin
+                    if state.bounce_direction eq 1 then begin
+                       if state.cache_location ne state.num_images-1 then begin
+                          state.cache_location++
+                       endif else state.bounce_direction = -1
+                    endif
+                    if state.bounce_direction eq -1 then begin
+                       if state.cache_location ne 0 then begin
+                          state.cache_location--
+                       endif else begin
+                          state.cache_location++
+                          state.bounce_direction = 1
+                       endelse
+                    endif
+                 end
+              endcase   
+              widget_control, state.blink_base_label_id, timer=state.animate_speed
+           endelse
+        endif
      end
      'speed_slider': begin
         speed = 10/float(event.value)
@@ -3452,6 +3503,8 @@ pro phast_startup, phast_dir, launch_dir, small
      speed_label = widget_label(blink_base,value='Animate speed: '+strmid(strtrim(string(1/state.animate_speed),1),0,4)+' image/sec')
      speed_slider = widget_slider(blink_base,value=10/state.animate_speed,/drag,uvalue='speed_slider',$
                                   min=10,/suppress_value,xsize=244)
+     cache_box = widget_base(blink_base,/row,/nonexclusive)
+     cache_button = widget_button(cache_box,value='Cache images to improve speed',uvalue='cache_images',tooltip='Caching images will speed up blinking, but you lose the ability to pan')
      animate_type_label = widget_label(blink_base,value='Select animation type')
      animate_type_box = widget_base(blink_base,/row,/exclusive)
      type_forward = widget_button(animate_type_box,value='Forward',uvalue='type_forward')
