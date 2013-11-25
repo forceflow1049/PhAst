@@ -227,21 +227,21 @@ pro phast_batch_event,event
         state.dark_filename = dialog_pickfile(/must_exist,/read,filter='*.fits')
         if state.dark_filename ne '' then begin
            widget_control,state.dark_label_id,set_value=state.dark_filename
-          ; fits_read,state.dark_filename,cal_dark,cal_dark_head
+           fits_read,state.dark_filename,cal_dark,cal_dark_head
         endif
      end
      'flat_select': begin
         state.flat_filename = dialog_pickfile(/must_exist,/read,filter='*.fits')
         if state.flat_filename ne '' then begin
            widget_control,state.flat_label_id,set_value=state.flat_filename
-          ; fits_read,state.flat_filename,cal_flat,cal_flat_head
+           fits_read,state.flat_filename,cal_flat,cal_flat_head
         endif
      end
      'bias_select': begin
         state.bias_filename = dialog_pickfile(/must_exist,/read,filter='*.fits')
         if state.bias_filename ne '' then begin
            widget_control,state.bias_label_id,set_value=state.bias_filename
-          ; fits_read,state.bias_filename,cal_bias,cal_bias_head
+           fits_read,state.bias_filename,cal_bias,cal_bias_head
         endif
      end
      'select_dir': begin
@@ -775,31 +775,20 @@ pro phast_calibrate, input_file=input_file,output_file=output_file,mosaic=mosaic
   if not keyword_set(output_file) then output_file = state.cal_file_name
 
 
-  ;retrieve number of extensions
+
   if keyword_set(mosaic) then begin
      fits_info,input_file,n_ext=num_ext,/silent
+     ;spawn, 'cp '+input_file+' '+output_file
   endif else begin
      num_ext = 1
   end
 
   for cal_index=1, num_ext do begin
 
-     ;read in the image data from the approriate extension
      if keyword_set(mosaic) then begin
         fits_read,input_file,cal_science,cal_science_head,exten_no=cal_index
      endif else fits_read,input_file,cal_science,cal_science_head
 
-     ;read in the calibration data if it exists
-     if keyword_set(mosaic) then begin
-        if state.dark_filename ne '' and state.dark_filename ne 'No dark loaded' then fits_read,state.dark_filename,cal_dark,cal_dark_head,exten_no=cal_index
-        if state.flat_filename ne '' and state.flat_filename ne 'No flat loaded' then fits_read,state.flat_filename,cal_flat,cal_flat_head,exten_no=cal_index
-        if state.bias_filename ne '' and state.bias_filename ne 'No bias loaded' then fits_read,state.bias_filename,cal_bias,cal_bias_head,exten_no=cal_index
-     endif else begin
-        if state.dark_filename ne '' and state.dark_filename ne 'No dark loaded' then fits_read,state.dark_filename,cal_dark,cal_dark_head
-        if state.flat_filename ne '' and state.flat_filename ne 'No flat loaded' then fits_read,state.flat_filename,cal_flat,cal_flat_head
-        if state.bias_filename ne '' and state.bias_filename ne 'No bias loaded' then fits_read,state.bias_filename,cal_bias,cal_bias_head
-     endelse
-     
      ;copy images so that originals are not modified
      main = float(cal_science)
      bias = float(cal_bias)

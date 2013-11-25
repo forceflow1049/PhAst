@@ -167,6 +167,7 @@ pro phast_initcommon, phast_dir, launch_dir, small
   state = {                $
     cache_location: 0, $   ;index of currently displayed image in cache
     cache_blink_images: 0,$;cache images while blinking? 
+    config_list: ptr_new(/allocate), $      ;list of available config files
     phot_coord: 0, $       ;output RA/DEC for photometry (1=yes)
     fast_zeropoint: 1, $   ;use fast mode for zeropoint computation?
     force_j2000: 0, $      ;force a J2000 equinox during calibration?

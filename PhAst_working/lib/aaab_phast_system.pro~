@@ -340,69 +340,6 @@ end
 
 ;----------------------------------------------------------------------
 
-pro phast_choose_config
-
-;dialog to allow switching between configuration files
-
-  common phast_state
-
-  if (not (xregistered('phast_choose_config', /noshow))) then begin
-
-     ;find .conf files in the config directory
-     file_list = file_search(state.phast_dir+'/config/*.conf',count=count)
-     if count gt 0 then begin
-        *(state.config_list) = file_list
-        split = strsplit(file_list,'/\',/extract)
-        short_list = strarr(count)
-        for i=0, count-1 do begin
-           string = reform(split[i,*])
-           short_list[i] = string[-1]
-        endfor
-     endif else begin
-        *(state.config_list) = "No configuration files available"
-        short_list = "No configuration files available"
-     endelse
-     
-
-     ;set up the GUI
-     config_base = $
-      widget_base(/base_align_left, $
-      group_leader = state.base_id, $
-      /column, $
-      title = 'Choose a configuration file', $
-      uvalue = 'phast_choose_config')
-
-     intro_label1 = widget_label(config_base, value='Choose a configuration file from the list below.')
-     intro_label2 = widget_label(config_base, value='Note that not all PhAst parameters can be set in this way.')
-     intro_label3 = widget_label(config_base, value='To have greater control over parameters, create a phast.conf file and place it in the root PhAst directory.')
-
-     list = widget_droplist(config_base, value=short_list,uvalue='list')
-
-     widget_control, config_base, /realize
-    
-    xmanager, 'phast_choose_config', config_base, /no_block
-
-  endif
-end
-
-;----------------------------------------------------------------------
-
-pro phast_choose_config_event, event
-
-;event handler for configuration file chooser
-
-  common phast_state
-
-  widget_control, event.id, get_uvalue=uvalue
-  
-  case uvalue of 
-     
-     'list': phast_read_config, file=(*(state.config_list))[event.index]
-  endcase
-end
-
-;----------------------------------------------------------------------
-
 pro phast_cycle_images, direction,animate=animate
 
 ;routine to switch between images in the image archive.  When an image
@@ -2497,7 +2434,7 @@ end
 
 ;---------------------------------------------------------------------
 
-pro phast_read_config, file=file
+pro phast_read_config
 
   ;routine to read a user-supplied configuration file and make the
   ;appropriate changes to state variables.
@@ -2506,11 +2443,8 @@ pro phast_read_config, file=file
   common phast_mpc_data
   common phast_images
 
-  if not keyword_set(file) then file = state.phast_dir+'phast.conf'
-
-  if file_test(file) eq 1 then begin
-     print, "Reading configuration file..."
-    readcol,file,var,val,FORMAT='A,A',/silent,delim=string(9b),comment='#'
+  if file_test(state.phast_dir+'phast.conf') eq 1 then begin
+    readcol,state.phast_dir+'phast.conf',var,val,FORMAT='A,A',/silent,delim=string(9b),comment='#'
     for i=0, n_elements(var)-1 do begin
       case strlowcase(strtrim(var[i])) of
                                 ;calibration
@@ -3314,7 +3248,6 @@ pro phast_startup, phast_dir, launch_dir, small
                   {cw_pdmenu_s, 1, 'Refresh'},$
                   {cw_pdmenu_s, 0, 'Refresh current image'},$
                   {cw_pdmenu_s, 2, 'Refresh all images'},$
-                  {cw_pdmenu_s, 0, 'Configure'},$
                   {cw_pdmenu_s, 0, '--------------'}, $
                   {cw_pdmenu_s, 2, 'Quit'}, $
                   {cw_pdmenu_s, 1, 'ColorMap'}, $ ; color menu
@@ -3857,7 +3790,6 @@ pro phast_topmenu_event, event
      end
      'Refresh current image': phast_refresh_image,state.current_image_index,state.imagename
      'Refresh all images': for i=0, state.num_images-1 do phast_refresh_image,i,image_archive[i]->get_name()
-     'Configure': phast_choose_config
      'Quit':     if (state.activator EQ 0) then phast_shutdown $
      else state.activator = 0
      ;ColorMap menu options:

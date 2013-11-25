@@ -2298,8 +2298,6 @@ pro phast_plot1region, iplot, fast=fast
   common phast_pdata
   common phast_state
   
-  print, 'enter phast_plot1region'
-
   phast_setwindow, state.draw_window_id
   
   widget_control, /hourglass
@@ -2324,7 +2322,7 @@ pro phast_plot1region, iplot, fast=fast
     endif
     
     text_begin_pos = strpos(reg_array[i], '{')
-
+    
     ; Text for region
     if (text_begin_pos ne -1) then begin
       text_end_pos = strpos(reg_array[i], '}')
@@ -2369,7 +2367,7 @@ pro phast_plot1region, iplot, fast=fast
       text_str = ''
       
     endelse
-
+    
     index_j2000 = where(strlowcase(coords_arr) eq 'j2000')
     index_b1950 = where(strlowcase(coords_arr) eq 'b1950')
     index_galactic = where(strlowcase(coords_arr) eq 'galactic')
@@ -2426,6 +2424,7 @@ pro phast_plot1region, iplot, fast=fast
         else:
       endcase
     endif else begin
+    
       if (strpos(coords_arr[0], ':')) ne -1 then begin
       
         ; Check that a WCS region is not overplotted on image with no WCS
@@ -2448,7 +2447,7 @@ pro phast_plot1region, iplot, fast=fast
       endelse
       
     endelse
-
+    
     CASE strlowcase(color_str) OF
     
       'red':     (*(plot_ptr[iplot])).options.color = '1'
@@ -2480,10 +2479,10 @@ pro phast_plot1region, iplot, fast=fast
           ycenter = ycenter / state.draw_window_size[1] * !d.y_size
           radius = radius / state.draw_window_size[0] * !d.x_size
         endif
-
+        
         tvcircle, radius, xcenter, ycenter, $
           _extra = (*(plot_ptr[iplot])).options,/device
-
+        
         if (text_str ne '') then xyouts, xcenter, ycenter, text_str, $
           alignment=0.5, _extra = (*(plot_ptr[iplot])).options, /device
       end

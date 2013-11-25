@@ -16,8 +16,6 @@ phast_system: contains common blocks and archives and basic routines
      phast_add_image
      phast_changemode
      phast_check_updates
-     phast_choose_config
-     phast_choose_config_event
      phast_cycle_images
      phast_debug_info
      phast_drawpath
@@ -173,7 +171,6 @@ phast_display: handles display of images
 
 phast_astrometry: handles image astrometry
      phast_degperpix
-     phast_extract_astrometry
      phast_getFieldEpoch
      phast_getoffset
      phast_getradec
@@ -182,7 +179,6 @@ phast_astrometry: handles image astrometry
      phast_wavestring
      phast_wcs2pix
      phast_wcsstring
-     phast_xy2ad
      phast_astrometry
 
 phast_photometry: handles image photometry
@@ -229,7 +225,6 @@ phast_pipeline: procedures for image processing
      phast_combine
      phast_combine_gui
      phast_combine_gui_event
-     phast_detect_moving_object
      phast_do_all
      phast_do_batch
      phast_do_missfits

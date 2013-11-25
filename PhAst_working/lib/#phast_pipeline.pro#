@@ -122,7 +122,7 @@ pro phast_batch
     if state.dark_toggle eq 1 then begin
       widget_control,dark_toggle,set_button=1
       widget_control,state.dark_select_id,sensitive=1
-    end
+ phassss    end
     if state.flat_toggle eq 1 then begin
       widget_control,flat_toggle,set_button=1
       widget_control,state.flat_select_id,sensitive=1

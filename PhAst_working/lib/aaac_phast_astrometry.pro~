@@ -5,13 +5,11 @@ function phast_degperpix, hdr
   ; This program calculates the pixel scale (deg/pixel) and returns the value
 
   common phast_state
-
+  
   On_error,2                      ;Return to caller
-
-  print, 'enter phast_daggerpix'
   
   extast, hdr, bastr, noparams    ;extract astrom params in deg.
-
+  
   a = bastr.crval[0]
   d = bastr.crval[1]
   
@@ -23,8 +21,8 @@ function phast_degperpix, hdr
   case proj of
     'GSS': gsssadxy, bastr, [a,a], [d,d1], x, y
     else:  ad2xy, [a,a], [d,d1], bastr, x, y
- endcase
-
+  endcase
+  
   dmin = sqrt( (x[1]-x[0])^2 + (y[1]-y[0])^2 ) ;det. size in pixels of 1 arcmin
   
   ; Convert to degrees per pixel and return scale
@@ -413,8 +411,6 @@ function phast_wcs2pix, coords, coord_sys=coord_sys, line=line
   ; check validity of state.astr_ptr and state.head_ptr before
   ; proceeding to grab wcs information
   
-  print, 'enter phast_wcs2pix'
-
   if ptr_valid(state.astr_ptr) then begin
     ctype = (*state.astr_ptr).ctype
     equinox = state.equinox
@@ -434,7 +430,7 @@ function phast_wcs2pix, coords, coord_sys=coord_sys, line=line
     headtype = strmid(ctype[0], 0, 4)
     n_coords = n_elements(coords)
   endif
-
+  
   case coord_sys of
   
     'j2000': begin
@@ -569,6 +565,7 @@ function phast_wcs2pix, coords, coord_sys=coord_sys, line=line
         precess, ra, dec, num_equinox, 2000.
         if (keyword_set(line)) then precess, ra1, dec1, num_equinox, 2000.
       endif
+      
     end
     
     'pixel': begin
@@ -578,7 +575,7 @@ function phast_wcs2pix, coords, coord_sys=coord_sys, line=line
     else:
     
   endcase
-
+  
   if (ptr_valid(state.astr_ptr) AND coord_sys ne 'pixel') then begin
   
     if (num_equinox ne 2000) then begin
@@ -606,6 +603,7 @@ function phast_wcs2pix, coords, coord_sys=coord_sys, line=line
       coords[3] = strcompress(string(y1),/remove_all)
     endif
   endif
+  
   return, coords
 end
 
