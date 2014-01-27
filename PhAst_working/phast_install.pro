@@ -18,19 +18,19 @@ error = 0
      while (1 eq 1)do begin
         catch, error
         if error ne 0 then begin
-           print, 'Error: Library not installed'
+           print, 'Error: Library not installed or out of date'
            print, ''
            catch, /cancel
            break
         endif
         print, ""
         print, 'Checking for installed NASA Astronomy User library...'
-        resolve_routine, 'MMM'
+        resolve_routine, 'TPV_EVAL',/either
         print, 'Library installed'
         print, ''
         break
      endwhile
-     error2=0
+     error2 = 0
      while (1 eq 1)do begin
         catch, error2
         if error2 ne 0 then begin
